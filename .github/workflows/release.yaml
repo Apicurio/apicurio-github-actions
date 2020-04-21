@@ -6,7 +6,7 @@ on:
   pull_request:
     branches: [master]
 
-name: Work flow for CI/CD
+name: Release Workflow
 
 jobs:
   build-release:
