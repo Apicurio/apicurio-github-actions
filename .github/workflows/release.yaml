@@ -60,4 +60,5 @@ jobs:
           tag_name: ${{ secrets.VERSION }}
           release_name: ${{ secrets.VERSION }}
       - name: Generate Release Notes
+        if: github.event_name == 'repository_dispatch'
         run: gren release --token=${{ secrets.GITHUB_TOKEN }} --override --prefix=v
