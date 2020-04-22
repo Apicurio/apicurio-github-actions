@@ -51,6 +51,7 @@ jobs:
       - name: Update Release Version ${{steps.metadata.outputs.release-version}}
         run: |
           mvn versions:set -DnewVersion=${{steps.metadata.outputs.release-version}} -DgenerateBackupPoms=false -DprocessAllModules=true
+          mvn clean install
           git add -A
           git commit -m"Automated version update: ${{steps.metadata.outputs.release-version}}"
           git push
@@ -61,7 +62,7 @@ jobs:
           gpg_passphrase: ${{ secrets.GPG_PASSPHRASE }}
           nexus_username: ${{ secrets.OSSRH_USERNAME }}
           nexus_password: ${{ secrets.OSSRH_TOKEN }}
-          maven_goals_phases: clean deploy --batch-mode --settings /home/runner/.m2/settings.xml
+          maven_goals_phases: clean deploy --batch-mode --settings /home/runner/.m2/settings.xml -DskipTests
           maven_profiles: release   
       - name: Create GitHub Release
         uses: actions/create-release@latest
@@ -75,6 +76,7 @@ jobs:
       - name: Update Snapshot version ${{steps.metadata.outputs.snapshot-version}}
         run: |
           mvn versions:set -DnewVersion=${{steps.metadata.outputs.snapshot-version}} -DgenerateBackupPoms=false -DprocessAllModules=true
+          mvn clean install
           git add -A
           git commit -m"Automated version update: ${{steps.metadata.outputs.snapshot-version}}"
           git push
