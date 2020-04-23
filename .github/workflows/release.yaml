@@ -27,6 +27,7 @@ jobs:
       - name: Set up settings.xml
         run: |
           echo "<settings><servers><server><id>${{ secrets.OSSRH_ID }}</id><username>${{ secrets.OSSRH_USERNAME }}</username><password>${{ secrets.OSSRH_TOKEN }}</password></server></servers><profiles><profile><id>${{ secrets.OSSRH_ID }}</id><activation><activeByDefault>true</activeByDefault></activation><properties><gpg.executable>gpg</gpg.executable><gpg.passphrase>${{ secrets.GPG_PASSPHRASE}}</gpg.passphrase></properties></profile></profiles></settings>" > /home/runner/.m2/settings.xml
+          cat /home/runner/.m2/settings.xml
       - name: Set up Gren
         run: npm install github-release-notes -g
       - name: Cache Dependencies
@@ -47,13 +48,17 @@ jobs:
           git branch --set-upstream-to=origin/master
           git pull
           echo "#### Listing files after clone ####"
-          ls -a
+          find .
       - name: Update Release Version ${{steps.metadata.outputs.release-version}}
         run: |
           mvn versions:set -DnewVersion=${{steps.metadata.outputs.release-version}} -DgenerateBackupPoms=false -DprocessAllModules=true
+      - name: Verify Build
+        run: |
           mvn clean install
-          git add -A
-          git commit -m"Automated version update: ${{steps.metadata.outputs.release-version}}"
+      - name: Commit Version Change
+        run: |
+          git add .
+          git commit -m "Automated version update: ${{steps.metadata.outputs.release-version}}"
           git push
       - name: Publish to Maven Central
         uses: samuelmeuli/action-maven-publish@v1
