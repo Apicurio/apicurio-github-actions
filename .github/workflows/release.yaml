@@ -40,9 +40,9 @@ jobs:
       - name: Code Checkout
         run: |
           git init
-          git config --global user.name "github-actions"
-          git config --global user.email "github-actions@github.com"
-          git remote add origin "https://$GITHUB_ACTOR:${{ secrets.ACCESS_TOKEN }}@github.com/$GITHUB_REPOSITORY.git"
+          git config --global user.name "apicurio-ci"
+          git config --global user.email "eric.wittmann+apicurio-ci@gmail.com"
+          git remote add origin "https://apicurio-ci:${{ secrets.ACCESS_TOKEN }}@github.com/$GITHUB_REPOSITORY.git"
           git fetch
           git checkout master
           git branch --set-upstream-to=origin/master
