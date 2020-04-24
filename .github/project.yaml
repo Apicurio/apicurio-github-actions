@@ -1,4 +1,4 @@
 name: apicurio-github-actions
 release-version: 1.0.2.Final
 snapshot-version: 1.0.3-SNAPSHOT
-try: 2
+try: 3
