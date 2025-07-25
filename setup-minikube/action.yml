@@ -159,7 +159,7 @@ runs:
         # Show running pods in system namespaces
         echo ""
         echo "📋 System pods:"
-        kubectl get pods --all-namespaces --field-selector=status.phase=Running | head -10
+        kubectl get pods --all-namespaces --field-selector=status.phase=Running | head -10 || true
         
         echo ""
         echo "🎉 Minikube setup completed successfully!"
