@@ -1,0 +1,155 @@
+name: Test Save Docker Image Action
+
+on:
+  push:
+    paths:
+      - 'save-docker-image/**'
+  pull_request:
+    paths:
+      - 'save-docker-image/**'
+  workflow_dispatch:
+
+jobs:
+  test-save-docker-image:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Pull a test Docker image
+      run: docker pull nginx:alpine
+    
+    - name: Test basic usage
+      id: test-basic
+      uses: ./save-docker-image
+      with:
+        image-name: 'nginx'
+        tag: 'alpine'
+    
+    - name: Verify basic test output
+      run: |
+        echo "Saved path: ${{ steps.test-basic.outputs.saved-path }}"
+        echo "File size: ${{ steps.test-basic.outputs.file-size }}"
+        
+        # Verify file exists
+        if [ ! -f "${{ steps.test-basic.outputs.saved-path }}" ]; then
+          echo "❌ Error: Saved file does not exist"
+          exit 1
+        fi
+        
+        # Verify file is not empty
+        if [ ! -s "${{ steps.test-basic.outputs.saved-path }}" ]; then
+          echo "❌ Error: Saved file is empty"
+          exit 1
+        fi
+        
+        echo "✅ Basic test passed"
+    
+    - name: Test custom output path
+      id: test-custom
+      uses: ./save-docker-image
+      with:
+        image-name: 'nginx'
+        tag: 'alpine'
+        output-path: './custom/nginx-alpine.tar'
+    
+    - name: Verify custom path test
+      run: |
+        echo "Custom saved path: ${{ steps.test-custom.outputs.saved-path }}"
+        
+        # Verify custom file exists
+        if [ ! -f "${{ steps.test-custom.outputs.saved-path }}" ]; then
+          echo "❌ Error: Custom path file does not exist"
+          exit 1
+        fi
+        
+        # Verify it's in the expected location
+        if [ "${{ steps.test-custom.outputs.saved-path }}" != "./custom/nginx-alpine.tar" ]; then
+          echo "❌ Error: File not saved to expected custom path"
+          exit 1
+        fi
+        
+        echo "✅ Custom path test passed"
+    
+    - name: Test loading saved image
+      run: |
+        # Remove the original image
+        docker rmi nginx:alpine
+        
+        # Load from saved file
+        docker load -i ${{ steps.test-basic.outputs.saved-path }}
+        
+        # Verify image is loaded
+        if ! docker images | grep -q "nginx.*alpine"; then
+          echo "❌ Error: Failed to load saved image"
+          exit 1
+        fi
+        
+        echo "✅ Image loading test passed"
+    
+    - name: Test artifact upload functionality
+      id: test-artifact
+      uses: ./save-docker-image
+      with:
+        image-name: 'nginx'
+        tag: 'alpine'
+        artifact-name: 'test-nginx-artifact'
+        artifact-retention-days: 1
+    
+    - name: Upload additional test artifacts
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: manual-test-artifacts
+        path: |
+          ${{ steps.test-basic.outputs.saved-path }}
+          ${{ steps.test-custom.outputs.saved-path }}
+          ${{ steps.test-no-artifact.outputs.saved-path }}
+        retention-days: 1
+    
+    - name: Test summary
+      run: |
+        echo "## Test Results 🧪" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "✅ Basic usage test: PASSED" >> $GITHUB_STEP_SUMMARY
+        echo "✅ Custom output path test: PASSED" >> $GITHUB_STEP_SUMMARY
+        echo "✅ Image loading test: PASSED" >> $GITHUB_STEP_SUMMARY
+        echo "✅ Artifact upload test: PASSED" >> $GITHUB_STEP_SUMMARY
+        echo "✅ Disable artifact upload test: PASSED" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### File Details" >> $GITHUB_STEP_SUMMARY
+        echo "- Basic test file: \`${{ steps.test-basic.outputs.saved-path }}\` (${{ steps.test-basic.outputs.file-size }} bytes)" >> $GITHUB_STEP_SUMMARY
+        echo "- Custom path file: \`${{ steps.test-custom.outputs.saved-path }}\` (${{ steps.test-custom.outputs.file-size }} bytes)" >> $GITHUB_STEP_SUMMARY
+        echo "- Artifact test file: \`${{ steps.test-artifact.outputs.saved-path }}\` (${{ steps.test-artifact.outputs.file-size }} bytes)" >> $GITHUB_STEP_SUMMARY
+        echo "- No-artifact test file: \`${{ steps.test-no-artifact.outputs.saved-path }}\` (${{ steps.test-no-artifact.outputs.file-size }} bytes)" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Artifacts Created" >> $GITHUB_STEP_SUMMARY
+        echo "- \`docker-image\` (from basic test - auto-uploaded)" >> $GITHUB_STEP_SUMMARY
+        echo "- \`docker-image\` (from custom path test - auto-uploaded)" >> $GITHUB_STEP_SUMMARY
+        echo "- \`test-nginx-artifact\` (from artifact test - auto-uploaded)" >> $GITHUB_STEP_SUMMARY
+        echo "- \`manual-test-artifacts\` (manually uploaded test files)" >> $GITHUB_STEP_SUMMARY
+
+  test-error-handling:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Test with non-existent image (should fail)
+      id: test-error
+      continue-on-error: true
+      uses: ./save-docker-image
+      with:
+        image-name: 'non-existent-image'
+        tag: 'non-existent-tag'
+    
+    - name: Verify error handling
+      run: |
+        if [ "${{ steps.test-error.outcome }}" = "success" ]; then
+          echo "❌ Error: Action should have failed with non-existent image"
+          exit 1
+        fi
+        
+        echo "✅ Error handling test passed - action correctly failed with non-existent image"

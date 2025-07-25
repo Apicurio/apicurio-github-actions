@@ -1,0 +1,82 @@
+name: 'Save Docker Image'
+description: 'Save a Docker image to a tar file for later use or caching'
+author: 'Apicurio'
+branding:
+  icon: 'save'
+  color: 'blue'
+
+inputs:
+  image-name:
+    description: 'Name of the Docker image to save'
+    required: true
+  output-path:
+    description: 'Path where the tar file should be saved'
+    required: false
+    default: './docker-image.tar'
+  tag:
+    description: 'Tag of the Docker image to save'
+    required: false
+    default: 'latest'
+  artifact-name:
+    description: 'Name for the uploaded artifact'
+    required: false
+    default: 'docker-image'
+  artifact-retention-days:
+    description: 'Number of days to retain the artifact'
+    required: false
+    default: '7'
+
+outputs:
+  saved-path:
+    description: 'Path where the Docker image was saved'
+    value: ${{ steps.save-image.outputs.saved-path }}
+  file-size:
+    description: 'Size of the saved Docker image file in bytes'
+    value: ${{ steps.save-image.outputs.file-size }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Save Docker Image
+      id: save-image
+      shell: bash
+      run: |
+        IMAGE_NAME="${{ inputs.image-name }}"
+        TAG="${{ inputs.tag }}"
+        OUTPUT_PATH="${{ inputs.output-path }}"
+        
+        # Create the full image name with tag
+        FULL_IMAGE_NAME="${IMAGE_NAME}:${TAG}"
+        
+        echo "Saving Docker image: ${FULL_IMAGE_NAME}"
+        echo "Output path: ${OUTPUT_PATH}"
+        
+        # Create output directory if it doesn't exist
+        mkdir -p "$(dirname "${OUTPUT_PATH}")"
+        
+        # Save the Docker image
+        docker save "${FULL_IMAGE_NAME}" -o "${OUTPUT_PATH}"
+        
+        if [ $? -eq 0 ]; then
+          echo "✅ Successfully saved Docker image to ${OUTPUT_PATH}"
+          
+          # Get file size
+          FILE_SIZE=$(stat -c%s "${OUTPUT_PATH}" 2>/dev/null || stat -f%z "${OUTPUT_PATH}" 2>/dev/null || echo "unknown")
+          
+          # Set outputs
+          echo "saved-path=${OUTPUT_PATH}" >> $GITHUB_OUTPUT
+          echo "file-size=${FILE_SIZE}" >> $GITHUB_OUTPUT
+          
+          echo "📊 File size: ${FILE_SIZE} bytes"
+        else
+          echo "❌ Failed to save Docker image"
+          exit 1
+        fi
+    
+    - name: Upload Docker Image Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ inputs.artifact-name }}
+        path: ${{ steps.save-image.outputs.saved-path }}
+        retention-days: ${{ inputs.artifact-retention-days }}
+        compression-level: 0

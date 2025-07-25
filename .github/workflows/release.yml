@@ -1,0 +1,168 @@
+name: Release Workflow
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to create release for'
+        required: true
+        type: string
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Get tag name
+      id: get-tag
+      run: |
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          TAG="${{ github.event.inputs.tag }}"
+        else
+          TAG="${{ github.ref_name }}"
+        fi
+        echo "tag=${TAG}" >> $GITHUB_OUTPUT
+        echo "Using tag: ${TAG}"
+    
+    - name: Validate actions
+      run: |
+        echo "🔍 Validating GitHub Actions..."
+        
+        # Check that all action directories have required files
+        for action_dir in */; do
+          if [ -f "${action_dir}action.yml" ] || [ -f "${action_dir}action.yaml" ]; then
+            echo "✅ Found action in ${action_dir}"
+            
+            # Validate action.yml syntax
+            if [ -f "${action_dir}action.yml" ]; then
+              echo "  📋 Validating ${action_dir}action.yml"
+              # Basic YAML validation
+              python3 -c "import yaml; yaml.safe_load(open('${action_dir}action.yml'))" || exit 1
+            fi
+            
+            # Check for README
+            if [ -f "${action_dir}README.md" ]; then
+              echo "  📖 README.md found"
+            else
+              echo "  ⚠️  README.md missing in ${action_dir}"
+            fi
+          fi
+        done
+        
+        echo "✅ All actions validated successfully"
+    
+    - name: Generate release notes
+      id: release-notes
+      run: |
+        echo "## 🚀 Apicurio GitHub Actions ${{ steps.get-tag.outputs.tag }}" > release_notes.md
+        echo "" >> release_notes.md
+        echo "This release includes the following GitHub Actions:" >> release_notes.md
+        echo "" >> release_notes.md
+        
+        # List all available actions
+        for action_dir in */; do
+          if [ -f "${action_dir}action.yml" ] || [ -f "${action_dir}action.yaml" ]; then
+            action_name=$(basename "$action_dir")
+            echo "### 🔧 ${action_name}" >> release_notes.md
+            
+            # Extract description from action.yml if available
+            if [ -f "${action_dir}action.yml" ]; then
+              description=$(grep "^description:" "${action_dir}action.yml" | sed "s/description: *['\"]*//" | sed "s/['\"]* *$//")
+              if [ -n "$description" ]; then
+                echo "$description" >> release_notes.md
+              fi
+            fi
+            
+            echo "" >> release_notes.md
+            echo "**Usage:**" >> release_notes.md
+            echo '```yaml' >> release_notes.md
+            echo "- uses: apicurio/apicurio-github-actions/${action_name}@${{ steps.get-tag.outputs.tag }}" >> release_notes.md
+            echo '```' >> release_notes.md
+            echo "" >> release_notes.md
+            echo "[📖 Full Documentation](./${action_name}/README.md)" >> release_notes.md
+            echo "" >> release_notes.md
+          fi
+        done
+        
+        echo "## 📦 Installation" >> release_notes.md
+        echo "" >> release_notes.md
+        echo "Use these actions in your workflows by referencing them with the tag:" >> release_notes.md
+        echo "" >> release_notes.md
+        echo '```yaml' >> release_notes.md
+        echo "- uses: apicurio/apicurio-github-actions/<action-name>@${{ steps.get-tag.outputs.tag }}" >> release_notes.md
+        echo '```' >> release_notes.md
+        echo "" >> release_notes.md
+        echo "## 🔗 Links" >> release_notes.md
+        echo "" >> release_notes.md
+        echo "- [📚 Repository](https://github.com/Apicurio/apicurio-github-actions)" >> release_notes.md
+        echo "- [🛠️ GitHub Actions Marketplace](https://github.com/marketplace?query=apicurio)" >> release_notes.md
+        echo "- [📋 Issues](https://github.com/Apicurio/apicurio-github-actions/issues)" >> release_notes.md
+    
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ steps.get-tag.outputs.tag }}
+        name: "Apicurio GitHub Actions ${{ steps.get-tag.outputs.tag }}"
+        body_path: release_notes.md
+        draft: false
+        prerelease: false
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Update major version tag
+      run: |
+        TAG="${{ steps.get-tag.outputs.tag }}"
+        
+        # Extract major version (e.g., v1.2.3 -> v1)
+        if [[ $TAG =~ ^v([0-9]+) ]]; then
+          MAJOR_VERSION="v${BASH_REMATCH[1]}"
+          echo "Updating major version tag: $MAJOR_VERSION"
+          
+          # Create or update the major version tag
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # Delete existing major version tag if it exists
+          git tag -d "$MAJOR_VERSION" 2>/dev/null || true
+          git push origin ":refs/tags/$MAJOR_VERSION" 2>/dev/null || true
+          
+          # Create new major version tag
+          git tag "$MAJOR_VERSION"
+          git push origin "$MAJOR_VERSION"
+          
+          echo "✅ Updated major version tag $MAJOR_VERSION to point to $TAG"
+        else
+          echo "⚠️ Tag $TAG doesn't follow semantic versioning pattern (vX.Y.Z)"
+        fi
+    
+    - name: Marketplace publication summary
+      run: |
+        echo "## 🎉 Release Created Successfully!" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Tag:** ${{ steps.get-tag.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 📦 Available Actions:" >> $GITHUB_STEP_SUMMARY
+        
+        for action_dir in */; do
+          if [ -f "${action_dir}action.yml" ] || [ -f "${action_dir}action.yaml" ]; then
+            action_name=$(basename "$action_dir")
+            echo "- **${action_name}**: \`apicurio/apicurio-github-actions/${action_name}@${{ steps.get-tag.outputs.tag }}\`" >> $GITHUB_STEP_SUMMARY
+          fi
+        done
+        
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 🚀 Next Steps:" >> $GITHUB_STEP_SUMMARY
+        echo "1. Actions are now available for use in workflows" >> $GITHUB_STEP_SUMMARY
+        echo "2. They will appear in the GitHub Actions Marketplace shortly" >> $GITHUB_STEP_SUMMARY
+        echo "3. Users can reference them using the tag \`${{ steps.get-tag.outputs.tag }}\`" >> $GITHUB_STEP_SUMMARY
