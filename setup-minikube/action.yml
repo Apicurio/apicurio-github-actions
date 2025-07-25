@@ -1,0 +1,165 @@
+name: 'Setup Minikube'
+description: 'Setup Minikube with optional Ingress and OLM support'
+author: 'Apicurio'
+branding:
+  icon: 'server'
+  color: 'purple'
+
+inputs:
+  ingress-enable:
+    description: 'Install an Ingress controller'
+    required: false
+    default: 'false'
+  olm-enable:
+    description: 'Install OLM'
+    required: false
+    default: 'false'
+  olm-version:
+    description: 'OLM version to install'
+    required: false
+    default: '0.32.0'
+  minikube-version:
+    description: 'Minikube version to use'
+    required: false
+    default: 'v1.36.0'
+  kubernetes-version:
+    description: 'Kubernetes version to use'
+    required: false
+    default: 'v1.33.3'
+  driver:
+    description: 'Minikube driver to use'
+    required: false
+    default: 'docker'
+  start-args:
+    description: 'Additional arguments to pass to minikube start'
+    required: false
+    default: '--force'
+
+outputs:
+  minikube-status:
+    description: 'Status of the Minikube cluster'
+    value: ${{ steps.setup-minikube.outputs.minikube-status }}
+  kubernetes-version:
+    description: 'Version of Kubernetes running in Minikube'
+    value: ${{ steps.setup-minikube.outputs.kubernetes-version }}
+  cluster-ip:
+    description: 'IP address of the Minikube cluster'
+    value: ${{ steps.setup-minikube.outputs.cluster-ip }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Enable port-forwarding
+      shell: bash
+      run: |
+        echo "🔧 Installing socat for port-forwarding..."
+        sudo apt-get update -qq
+        sudo apt-get -y install socat
+        echo "✅ Port-forwarding support enabled"
+
+    - name: Setup Minikube
+      id: setup-minikube
+      uses: manusa/actions-setup-minikube@v2.13.0
+      with:
+        driver: ${{ inputs.driver }}
+        minikube version: ${{ inputs.minikube-version }}
+        kubernetes version: ${{ inputs.kubernetes-version }}
+        start args: ${{ inputs.start-args }}
+
+    - name: Get Minikube Status
+      id: minikube-info
+      shell: bash
+      run: |
+        echo "📊 Getting Minikube cluster information..."
+        
+        # Get Minikube status
+        MINIKUBE_STATUS=$(minikube status --format='{{.Host}}' 2>/dev/null || echo "unknown")
+        echo "minikube-status=${MINIKUBE_STATUS}" >> $GITHUB_OUTPUT
+        echo "🔍 Minikube status: ${MINIKUBE_STATUS}"
+        
+        # Get Kubernetes version
+        K8S_VERSION=$(kubectl version --short --client=false 2>/dev/null | grep "Server Version" | awk '{print $3}' || echo "unknown")
+        echo "kubernetes-version=${K8S_VERSION}" >> $GITHUB_OUTPUT
+        echo "🔍 Kubernetes version: ${K8S_VERSION}"
+        
+        # Get cluster IP
+        CLUSTER_IP=$(minikube ip 2>/dev/null || echo "unknown")
+        echo "cluster-ip=${CLUSTER_IP}" >> $GITHUB_OUTPUT
+        echo "🔍 Cluster IP: ${CLUSTER_IP}"
+        
+        # Display cluster info
+        echo ""
+        echo "📋 Cluster Information:"
+        kubectl cluster-info || echo "⚠️  Could not retrieve cluster info"
+
+    - name: Enable Ingress
+      if: inputs.ingress-enable == 'true'
+      shell: bash
+      run: |
+        echo "🚀 Enabling Ingress addon..."
+        minikube addons enable ingress
+        
+        echo "⏳ Waiting for Ingress controller to be ready..."
+        kubectl wait --namespace ingress-nginx \
+          --for=condition=ready pod \
+          --selector=app.kubernetes.io/component=controller \
+          --timeout=300s || echo "⚠️  Ingress controller may not be fully ready"
+        
+        echo "✅ Ingress addon enabled"
+
+    - name: Install OLM
+      if: inputs.olm-enable == 'true'
+      shell: bash
+      run: |
+        echo "🚀 Installing OLM (Operator Lifecycle Manager)..."
+        echo "📦 OLM Version: ${{ inputs.olm-version }}"
+        
+        # Download and install OLM
+        curl -L https://github.com/operator-framework/operator-lifecycle-manager/releases/download/v${{ inputs.olm-version }}/install.sh -o install-olm.sh
+        chmod +x install-olm.sh
+        ./install-olm.sh v${{ inputs.olm-version }}
+        rm install-olm.sh
+        
+        echo "⏳ Waiting for OLM to be ready..."
+        kubectl wait --for=condition=ready pod -l app=olm-operator --namespace=olm --timeout=300s || echo "⚠️  OLM may not be fully ready"
+        kubectl wait --for=condition=ready pod -l app=catalog-operator --namespace=olm --timeout=300s || echo "⚠️  Catalog operator may not be fully ready"
+        
+        echo "✅ OLM installation completed"
+
+    - name: Setup Minikube tunnel
+      shell: bash
+      run: |
+        echo "🌐 Starting Minikube tunnel in background..."
+        minikube tunnel &
+        
+        # Give the tunnel a moment to start
+        sleep 5
+        
+        echo "✅ Minikube tunnel started"
+        echo "ℹ️  The tunnel will run in the background for the duration of this job"
+
+    - name: Verify Setup
+      shell: bash
+      run: |
+        echo "🔍 Verifying Minikube setup..."
+        
+        # Check if kubectl is working
+        if kubectl get nodes; then
+          echo "✅ kubectl is working correctly"
+        else
+          echo "❌ kubectl is not working"
+          exit 1
+        fi
+        
+        # List enabled addons
+        echo ""
+        echo "📋 Enabled addons:"
+        minikube addons list | grep enabled || echo "No addons enabled"
+        
+        # Show running pods in system namespaces
+        echo ""
+        echo "📋 System pods:"
+        kubectl get pods --all-namespaces --field-selector=status.phase=Running | head -10
+        
+        echo ""
+        echo "🎉 Minikube setup completed successfully!"
