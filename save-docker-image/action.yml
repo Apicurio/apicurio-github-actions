@@ -25,6 +25,10 @@ inputs:
     description: 'Number of days to retain the artifact'
     required: false
     default: '7'
+  upload:
+    description: 'Whether to upload the saved image as an artifact'
+    required: false
+    default: 'true'
 
 outputs:
   saved-path:
@@ -74,6 +78,7 @@ runs:
         fi
     
     - name: Upload Docker Image Artifact
+      if: ${{ inputs.upload == 'true' }}
       uses: actions/upload-artifact@v4
       with:
         name: ${{ inputs.artifact-name }}

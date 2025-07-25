@@ -83,9 +83,9 @@ jobs:
 | `image-name` | Name of the Docker image to save | ✅ Yes | - |
 | `tag` | Tag of the Docker image to save | ❌ No | `latest` |
 | `output-path` | Path where the tar file should be saved | ❌ No | `./docker-image.tar` |
-| `upload-artifact` | Whether to upload the saved image as an artifact | ❌ No | `true` |
+| `upload` | Whether to upload the saved image as an artifact | ❌ No | `true` |
 | `artifact-name` | Name for the uploaded artifact | ❌ No | `docker-image` |
-| `artifact-retention-days` | Number of days to retain the artifact | ❌ No | `30` |
+| `artifact-retention-days` | Number of days to retain the artifact | ❌ No | `7` |
 
 ## Outputs
 
@@ -134,7 +134,7 @@ To disable automatic artifact upload:
   uses: apicurio/apicurio-github-actions/save-docker-image@v1
   with:
     image-name: 'my-app'
-    upload-artifact: 'false'
+    upload: 'false'
 ```
 
 ### 3. Multi-Job Workflows
@@ -177,7 +177,7 @@ Include Docker images as release artifacts:
     image-name: 'my-app'
     tag: ${{ github.ref_name }}
     output-path: './release/my-app-${{ github.ref_name }}.tar'
-    upload-artifact: 'false'  # Don't upload as artifact for releases
+    upload: 'false'  # Don't upload as artifact for releases
 
 - name: Create Release
   uses: softprops/action-gh-release@v1
