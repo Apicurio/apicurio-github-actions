@@ -1,0 +1,205 @@
+name: Test Load Docker Image Action
+
+on:
+  push:
+    paths:
+      - 'load-docker-image/**'
+  pull_request:
+    paths:
+      - 'load-docker-image/**'
+  workflow_dispatch:
+
+jobs:
+  test-load-docker-image:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Pull and save a test Docker image
+      run: |
+        docker pull nginx:alpine
+        docker save nginx:alpine -o nginx-alpine.tar
+    
+    - name: Upload test image as artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: docker-image
+        path: nginx-alpine.tar
+        retention-days: 1
+    
+    - name: Remove local image to test loading
+      run: docker rmi nginx:alpine
+    
+    - name: Test basic usage
+      id: test-basic
+      uses: ./load-docker-image
+      with:
+        artifact-name: 'docker-image'
+        image-name: 'nginx'
+        tag: 'alpine'
+    
+    - name: Verify basic test output
+      run: |
+        echo "Loaded image: ${{ steps.test-basic.outputs.loaded-image }}"
+        echo "Image ID: ${{ steps.test-basic.outputs.image-id }}"
+        echo "File size: ${{ steps.test-basic.outputs.file-size }}"
+        
+        # Verify image is loaded
+        if ! docker images | grep -q "nginx.*alpine"; then
+          echo "❌ Error: Image not loaded correctly"
+          exit 1
+        fi
+        
+        # Verify outputs are not empty
+        if [ -z "${{ steps.test-basic.outputs.loaded-image }}" ]; then
+          echo "❌ Error: loaded-image output is empty"
+          exit 1
+        fi
+        
+        if [ -z "${{ steps.test-basic.outputs.image-id }}" ]; then
+          echo "❌ Error: image-id output is empty"
+          exit 1
+        fi
+        
+        if [ -z "${{ steps.test-basic.outputs.file-size }}" ]; then
+          echo "❌ Error: file-size output is empty"
+          exit 1
+        fi
+        
+        echo "✅ Basic test passed"
+    
+    - name: Test custom image path
+      run: |
+        # Create custom directory and save another image
+        mkdir -p custom-path
+        docker pull busybox:latest
+        docker save busybox:latest -o custom-path/busybox.tar
+    
+    - name: Upload custom path test image
+      uses: actions/upload-artifact@v4
+      with:
+        name: custom-image
+        path: custom-path/busybox.tar
+        retention-days: 1
+    
+    - name: Remove busybox image to test loading
+      run: docker rmi busybox:latest
+    
+    - name: Test custom path usage
+      id: test-custom
+      uses: ./load-docker-image
+      with:
+        artifact-name: 'custom-image'
+        image-path: './custom-download'
+        image-name: 'busybox'
+        tag: 'latest'
+    
+    - name: Verify custom path test
+      run: |
+        echo "Custom loaded image: ${{ steps.test-custom.outputs.loaded-image }}"
+        
+        # Verify busybox image is loaded
+        if ! docker images | grep -q "busybox.*latest"; then
+          echo "❌ Error: Custom path image not loaded correctly"
+          exit 1
+        fi
+        
+        echo "✅ Custom path test passed"
+    
+    - name: Test image verification
+      run: |
+        # Test that the loaded image works
+        docker run --rm nginx:alpine nginx -v
+        docker run --rm busybox:latest echo "BusyBox test successful"
+        
+        echo "✅ Image verification test passed"
+    
+    - name: Test summary
+      run: |
+        echo "## Test Results 🧪" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "✅ Basic usage test: PASSED" >> $GITHUB_STEP_SUMMARY
+        echo "✅ Custom image path test: PASSED" >> $GITHUB_STEP_SUMMARY
+        echo "✅ Image verification test: PASSED" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Loaded Images" >> $GITHUB_STEP_SUMMARY
+        echo "- Basic test: \`${{ steps.test-basic.outputs.loaded-image }}\` (ID: ${{ steps.test-basic.outputs.image-id }})" >> $GITHUB_STEP_SUMMARY
+        echo "- Custom path test: \`${{ steps.test-custom.outputs.loaded-image }}\` (ID: ${{ steps.test-custom.outputs.image-id }})" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### File Details" >> $GITHUB_STEP_SUMMARY
+        echo "- Basic test file size: ${{ steps.test-basic.outputs.file-size }} bytes" >> $GITHUB_STEP_SUMMARY
+        echo "- Custom test file size: ${{ steps.test-custom.outputs.file-size }} bytes" >> $GITHUB_STEP_SUMMARY
+
+  test-error-handling:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Test with non-existent artifact (should fail)
+      id: test-error
+      continue-on-error: true
+      uses: ./load-docker-image
+      with:
+        artifact-name: 'non-existent-artifact'
+    
+    - name: Verify error handling
+      run: |
+        if [ "${{ steps.test-error.outcome }}" = "success" ]; then
+          echo "❌ Error: Action should have failed with non-existent artifact"
+          exit 1
+        fi
+        
+        echo "✅ Error handling test passed - action correctly failed with non-existent artifact"
+
+  test-with-minikube:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Setup Minikube
+      uses: ./setup-minikube
+      with:
+        minikube-version: 'v1.36.0'
+        kubernetes-version: 'v1.33.3'
+    
+    - name: Pull and save test image
+      run: |
+        docker pull hello-world:latest
+        docker save hello-world:latest -o hello-world.tar
+    
+    - name: Upload test image for minikube test
+      uses: actions/upload-artifact@v4
+      with:
+        name: minikube-test-image
+        path: hello-world.tar
+        retention-days: 1
+    
+    - name: Remove local image
+      run: docker rmi hello-world:latest
+    
+    - name: Test loading with minikube
+      id: test-minikube
+      uses: ./load-docker-image
+      with:
+        artifact-name: 'minikube-test-image'
+        image-name: 'hello-world'
+        tag: 'latest'
+        minikube: 'true'
+    
+    - name: Verify minikube loading
+      run: |
+        echo "Minikube loaded image: ${{ steps.test-minikube.outputs.loaded-image }}"
+        
+        # Verify image is in minikube
+        if ! minikube image ls | grep -q "hello-world"; then
+          echo "❌ Error: Image not loaded into minikube"
+          exit 1
+        fi
+        
+        echo "✅ Minikube loading test passed"

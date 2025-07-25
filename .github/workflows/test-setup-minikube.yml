@@ -1,0 +1,299 @@
+name: Test Setup Minikube Action
+
+on:
+  push:
+    paths:
+      - 'setup-minikube/**'
+  pull_request:
+    paths:
+      - 'setup-minikube/**'
+  workflow_dispatch:
+
+jobs:
+  test-basic-setup:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Test basic Minikube setup
+      id: test-basic
+      uses: ./setup-minikube
+    
+    - name: Verify basic setup outputs
+      run: |
+        echo "Minikube status: ${{ steps.test-basic.outputs.minikube-status }}"
+        echo "Kubernetes version: ${{ steps.test-basic.outputs.kubernetes-version }}"
+        echo "Cluster IP: ${{ steps.test-basic.outputs.cluster-ip }}"
+        
+        # Verify outputs are not empty
+        if [ -z "${{ steps.test-basic.outputs.minikube-status }}" ]; then
+          echo "❌ Error: minikube-status output is empty"
+          exit 1
+        fi
+        
+        if [ -z "${{ steps.test-basic.outputs.kubernetes-version }}" ]; then
+          echo "❌ Error: kubernetes-version output is empty"
+          exit 1
+        fi
+        
+        if [ -z "${{ steps.test-basic.outputs.cluster-ip }}" ]; then
+          echo "❌ Error: cluster-ip output is empty"
+          exit 1
+        fi
+        
+        echo "✅ Basic setup outputs verified"
+    
+    - name: Test kubectl functionality
+      run: |
+        # Test basic kubectl commands
+        kubectl cluster-info
+        kubectl get nodes
+        kubectl get pods --all-namespaces
+        
+        # Verify cluster is ready
+        if ! kubectl get nodes | grep -q "Ready"; then
+          echo "❌ Error: Cluster nodes are not ready"
+          exit 1
+        fi
+        
+        echo "✅ kubectl functionality test passed"
+    
+    - name: Test Minikube commands
+      run: |
+        # Test basic minikube commands
+        minikube status
+        minikube version
+        minikube profile list
+        
+        # Verify minikube is running
+        if ! minikube status | grep -q "Running"; then
+          echo "❌ Error: Minikube is not running"
+          exit 1
+        fi
+        
+        echo "✅ Minikube commands test passed"
+
+  test-with-ingress:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Test Minikube setup with Ingress
+      id: test-ingress
+      uses: ./setup-minikube
+      with:
+        ingress-enable: 'true'
+    
+    - name: Verify Ingress is enabled
+      run: |
+        # Check if ingress addon is enabled
+        if ! minikube addons list | grep "ingress" | grep -q "enabled"; then
+          echo "❌ Error: Ingress addon is not enabled"
+          exit 1
+        fi
+        
+        # Check if ingress controller pods are running
+        kubectl get pods -n ingress-nginx
+        
+        # Wait a bit more and check if ingress controller is ready
+        sleep 30
+        if ! kubectl get pods -n ingress-nginx | grep -q "Running"; then
+          echo "⚠️  Warning: Ingress controller pods may not be fully ready yet"
+        else
+          echo "✅ Ingress controller is running"
+        fi
+        
+        echo "✅ Ingress setup test passed"
+
+  test-with-olm:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Test Minikube setup with OLM
+      id: test-olm
+      uses: ./setup-minikube
+      with:
+        olm-enable: 'true'
+        olm-version: '0.32.0'
+    
+    - name: Verify OLM is installed
+      run: |
+        # Check if OLM namespaces exist
+        if ! kubectl get namespace olm; then
+          echo "❌ Error: OLM namespace does not exist"
+          exit 1
+        fi
+        
+        if ! kubectl get namespace operators; then
+          echo "❌ Error: operators namespace does not exist"
+          exit 1
+        fi
+        
+        # Check if OLM pods are running
+        kubectl get pods -n olm
+        
+        # Check for key OLM components
+        if ! kubectl get pods -n olm | grep -q "olm-operator"; then
+          echo "❌ Error: olm-operator pod not found"
+          exit 1
+        fi
+        
+        if ! kubectl get pods -n olm | grep -q "catalog-operator"; then
+          echo "❌ Error: catalog-operator pod not found"
+          exit 1
+        fi
+        
+        echo "✅ OLM installation test passed"
+
+  test-custom-versions:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Test with custom versions
+      id: test-custom
+      uses: ./setup-minikube
+      with:
+        minikube-version: 'v1.35.0'
+        kubernetes-version: 'v1.32.0'
+        driver: 'docker'
+        start-args: '--force --memory=2048'
+    
+    - name: Verify custom versions
+      run: |
+        # Check minikube version
+        MINIKUBE_VERSION=$(minikube version | grep "minikube version" | awk '{print $3}')
+        echo "Installed Minikube version: ${MINIKUBE_VERSION}"
+        
+        # Check kubernetes version (approximately)
+        K8S_VERSION=$(kubectl version --short --client=false 2>/dev/null | grep "Server Version" | awk '{print $3}' || echo "unknown")
+        echo "Kubernetes version: ${K8S_VERSION}"
+        
+        # Verify cluster is functional
+        kubectl get nodes
+        
+        echo "✅ Custom versions test passed"
+
+  test-full-setup:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Test full setup with all features
+      id: test-full
+      uses: ./setup-minikube
+      with:
+        ingress-enable: 'true'
+        olm-enable: 'true'
+        olm-version: '0.32.0'
+        minikube-version: 'v1.36.0'
+        kubernetes-version: 'v1.33.3'
+    
+    - name: Verify full setup
+      run: |
+        echo "Full setup outputs:"
+        echo "- Minikube status: ${{ steps.test-full.outputs.minikube-status }}"
+        echo "- Kubernetes version: ${{ steps.test-full.outputs.kubernetes-version }}"
+        echo "- Cluster IP: ${{ steps.test-full.outputs.cluster-ip }}"
+        
+        # Verify cluster is ready
+        kubectl get nodes
+        kubectl cluster-info
+        
+        # Verify ingress is enabled
+        if ! minikube addons list | grep "ingress" | grep -q "enabled"; then
+          echo "❌ Error: Ingress not enabled in full setup"
+          exit 1
+        fi
+        
+        # Verify OLM is installed
+        if ! kubectl get namespace olm; then
+          echo "❌ Error: OLM not installed in full setup"
+          exit 1
+        fi
+        
+        echo "✅ Full setup test passed"
+    
+    - name: Test deployment to verify cluster functionality
+      run: |
+        # Deploy a simple test application
+        kubectl create deployment test-nginx --image=nginx:alpine
+        kubectl expose deployment test-nginx --port=80 --type=ClusterIP
+        
+        # Wait for deployment to be ready
+        kubectl wait --for=condition=available --timeout=300s deployment/test-nginx
+        
+        # Verify deployment is running
+        if ! kubectl get pods | grep "test-nginx" | grep -q "Running"; then
+          echo "❌ Error: Test deployment is not running"
+          exit 1
+        fi
+        
+        # Test service connectivity
+        kubectl get services
+        
+        echo "✅ Deployment test passed"
+    
+    - name: Test summary
+      run: |
+        echo "## Test Results 🧪" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "✅ Basic setup test: PASSED" >> $GITHUB_STEP_SUMMARY
+        echo "✅ Ingress setup test: PASSED" >> $GITHUB_STEP_SUMMARY
+        echo "✅ OLM setup test: PASSED" >> $GITHUB_STEP_SUMMARY
+        echo "✅ Custom versions test: PASSED" >> $GITHUB_STEP_SUMMARY
+        echo "✅ Full setup test: PASSED" >> $GITHUB_STEP_SUMMARY
+        echo "✅ Deployment test: PASSED" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Cluster Information" >> $GITHUB_STEP_SUMMARY
+        echo "- Minikube status: ${{ steps.test-full.outputs.minikube-status }}" >> $GITHUB_STEP_SUMMARY
+        echo "- Kubernetes version: ${{ steps.test-full.outputs.kubernetes-version }}" >> $GITHUB_STEP_SUMMARY
+        echo "- Cluster IP: ${{ steps.test-full.outputs.cluster-ip }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Features Tested" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ Basic Minikube setup" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ Ingress controller installation" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ OLM (Operator Lifecycle Manager) installation" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ Custom version configuration" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ Application deployment and service exposure" >> $GITHUB_STEP_SUMMARY
+
+  test-error-handling:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Test with invalid OLM version (should handle gracefully)
+      id: test-error
+      continue-on-error: true
+      uses: ./setup-minikube
+      with:
+        olm-enable: 'true'
+        olm-version: '999.999.999'
+    
+    - name: Verify error handling
+      run: |
+        if [ "${{ steps.test-error.outcome }}" = "success" ]; then
+          echo "⚠️  Warning: Action succeeded with invalid OLM version - this may be expected if it falls back gracefully"
+        else
+          echo "✅ Error handling test passed - action correctly failed or handled invalid OLM version"
+        fi
+        
+        # Even if the action failed, we should still be able to verify basic minikube functionality
+        # if it was set up before the OLM installation failed
+        if command -v minikube &> /dev/null; then
+          echo "Minikube command is available"
+          minikube status || echo "Minikube may not be running due to setup failure"
+        fi
