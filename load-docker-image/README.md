@@ -30,8 +30,21 @@ A GitHub Action to download and load a Docker image from an artifact created by 
   uses: apicurio/apicurio-github-actions/load-docker-image@v1
   with:
     artifact-name: 'my-app-image'
+    image-file: './images/my-app.tar'
     image-name: 'my-app'
     tag: 'v1.2.3'
+```
+
+### Skip Download (Use Existing Image File)
+
+```yaml
+- name: Load Docker Image from Existing File
+  uses: apicurio/apicurio-github-actions/load-docker-image@v1
+  with:
+    download: 'false'
+    image-file: './pre-existing/my-app.tar'
+    image-name: 'my-app'
+    tag: 'latest'
 ```
 
 ### Complete Workflow Example
@@ -90,9 +103,11 @@ jobs:
 | Input | Description | Required | Default |
 |-------|-------------|----------|---------|
 | `artifact-name` | Name of the artifact containing the Docker image | ❌ No | `docker-image` |
-| `image-path` | Path where the Docker image tar file will be downloaded to | ❌ No | `./docker-image.tar` |
+| `image-file` | Full path to the Docker image tar file (including directory and filename) | ❌ No | `./docker-image.tar` |
+| `download` | Whether to download the artifact (if false, expects image file to already exist) | ❌ No | `true` |
 | `image-name` | Expected name of the Docker image (for verification) | ❌ No | - |
 | `tag` | Expected tag of the Docker image (for verification) | ❌ No | `latest` |
+| `minikube` | Load the Docker image into minikube as well | ❌ No | `false` |
 
 ## Outputs
 
@@ -217,18 +232,82 @@ Load multiple Docker images in a single job:
   uses: apicurio/apicurio-github-actions/load-docker-image@v1
   with:
     artifact-name: 'app-image'
+    image-file: './images/app.tar'
     image-name: 'my-app'
 
 - name: Load database image
   uses: apicurio/apicurio-github-actions/load-docker-image@v1
   with:
     artifact-name: 'db-image'
+    image-file: './images/db.tar'
     image-name: 'my-db'
 
 - name: Start services
   run: |
     docker run -d --name app my-app:latest
     docker run -d --name db my-db:latest
+```
+
+### 6. Custom Image File Locations
+
+Organize Docker images in specific directories:
+
+```yaml
+- name: Load Docker Image to Custom Location
+  uses: apicurio/apicurio-github-actions/load-docker-image@v1
+  with:
+    artifact-name: 'my-app-image'
+    image-file: './build/artifacts/images/my-app-v1.2.3.tar'
+    image-name: 'my-app'
+    tag: 'v1.2.3'
+```
+
+### 7. Skip Download for Pre-existing Images
+
+Use when you already have the image file and want to skip the download step:
+
+```yaml
+- name: Copy image from external source
+  run: |
+    # Copy from some external location or previous step
+    cp /external/path/my-app.tar ./my-app.tar
+
+- name: Load existing Docker image
+  uses: apicurio/apicurio-github-actions/load-docker-image@v1
+  with:
+    download: 'false'
+    image-file: './my-app.tar'
+    image-name: 'my-app'
+    tag: 'latest'
+```
+
+### 8. Conditional Download Based on File Existence
+
+Download only if the image file doesn't already exist:
+
+```yaml
+- name: Check if image file exists
+  id: check-file
+  run: |
+    if [ -f "./cache/my-app.tar" ]; then
+      echo "exists=true" >> $GITHUB_OUTPUT
+    else
+      echo "exists=false" >> $GITHUB_OUTPUT
+    fi
+
+- name: Load from cache (skip download)
+  if: steps.check-file.outputs.exists == 'true'
+  uses: apicurio/apicurio-github-actions/load-docker-image@v1
+  with:
+    download: 'false'
+    image-file: './cache/my-app.tar'
+
+- name: Download and load image
+  if: steps.check-file.outputs.exists == 'false'
+  uses: apicurio/apicurio-github-actions/load-docker-image@v1
+  with:
+    artifact-name: 'my-app-image'
+    image-file: './cache/my-app.tar'
 ```
 
 ## Requirements
@@ -251,9 +330,10 @@ The action will fail if:
 ### Common Issues
 
 1. **Artifact not found**: Ensure the artifact name matches exactly with the one created by `save-docker-image`
-2. **File not found**: Check that the `image-path` is correct and the file exists
+2. **File not found**: Check that the `image-file` path is correct and the file exists at that location
 3. **Docker not available**: Ensure Docker is installed and running in the runner environment
 4. **Permission denied**: Check file permissions and runner capabilities
+5. **Download disabled but file missing**: When `download: 'false'`, ensure the image file already exists at the specified `image-file` location
 
 ### Debug Information
 

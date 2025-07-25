@@ -10,10 +10,14 @@ inputs:
     description: 'Name of the artifact containing the Docker image'
     required: false
     default: 'docker-image'
-  image-path:
-    description: 'Path where the Docker image tar file will be downloaded to'
+  image-file:
+    description: 'Full path to the Docker image tar file (including directory and filename)'
     required: false
-    default: '.'
+    default: './docker-image.tar'
+  download:
+    description: 'Whether to download the artifact (if false, expects image file to already exist)'
+    required: false
+    default: 'true'
   image-name:
     description: 'Expected name of the Docker image (for verification)'
     required: false
@@ -40,23 +44,46 @@ outputs:
 runs:
   using: 'composite'
   steps:
-    - name: Ensure Image Path Exists
-      id: mkdir-image-path
+    - name: Ensure Image File Directory Exists
+      id: mkdir-image-dir
       shell: bash
       run: |
-        mkdir -p ${{ inputs.image-path }}
+        IMAGE_FILE="${{ inputs.image-file }}"
+        IMAGE_DIR=$(dirname "${IMAGE_FILE}")
+        echo "Creating directory: ${IMAGE_DIR}"
+        mkdir -p "${IMAGE_DIR}"
 
     - name: Download Docker Image Artifact
+      if: inputs.download == 'true'
       uses: actions/download-artifact@v4
       with:
         name: ${{ inputs.artifact-name }}
-        path: ${{ inputs.image-path }}
+        path: /tmp/docker-image-download
+
+    - name: Copy Image to Target Location
+      if: inputs.download == 'true'
+      shell: bash
+      run: |
+        TEMP_IMAGE="/tmp/docker-image-download/${{ inputs.artifact-name }}"
+        TARGET_IMAGE="${{ inputs.image-file }}"
+        
+        echo "Copying image from ${TEMP_IMAGE} to ${TARGET_IMAGE}"
+        
+        if [ ! -f "${TEMP_IMAGE}" ]; then
+          echo "❌ Downloaded image file not found: ${TEMP_IMAGE}"
+          echo "Files in download directory:"
+          ls -al /tmp/docker-image-download/
+          exit 1
+        fi
+        
+        cp "${TEMP_IMAGE}" "${TARGET_IMAGE}"
+        echo "✅ Image copied successfully"
     
     - name: Load Docker Image
       id: load-image
       shell: bash
       run: |
-        IMAGE="${{ inputs.image-path }}/${{ inputs.artifact-name }}"
+        IMAGE="${{ inputs.image-file }}"
         EXPECTED_NAME="${{ inputs.image-name }}"
         EXPECTED_TAG="${{ inputs.tag }}"
         
@@ -65,8 +92,9 @@ runs:
         # Check if the tar file exists
         if [ ! -f "${IMAGE}" ]; then
           echo "❌ Docker image file not found: ${IMAGE}"
-          echo "Files in image path:"
-          ls -al ${{ inputs.image-path }}
+          echo "Files in image directory:"
+          IMAGE_DIR=$(dirname "${IMAGE}")
+          ls -al "${IMAGE_DIR}"
           exit 1
         fi
         

@@ -70,14 +70,14 @@ jobs:
         
         echo "✅ Basic test passed"
     
-    - name: Test custom image path
+    - name: Test custom image file location
       run: |
         # Create custom directory and save another image
         mkdir -p custom-path
         docker pull busybox:latest
         docker save busybox:latest -o custom-path/busybox.tar
     
-    - name: Upload custom path test image
+    - name: Upload custom file test image
       uses: actions/upload-artifact@v4
       with:
         name: busybox.tar
@@ -87,26 +87,32 @@ jobs:
     - name: Remove busybox image to test loading
       run: docker rmi busybox:latest
     
-    - name: Test custom path usage
+    - name: Test custom image-file usage
       id: test-custom
       uses: ./load-docker-image
       with:
         artifact-name: 'busybox.tar'
-        image-path: './custom-download'
+        image-file: './custom-download/busybox-custom.tar'
         image-name: 'busybox'
         tag: 'latest'
     
-    - name: Verify custom path test
+    - name: Verify custom image-file test
       run: |
         echo "Custom loaded image: ${{ steps.test-custom.outputs.loaded-image }}"
         
         # Verify busybox image is loaded
         if ! docker images | grep -q "busybox.*latest"; then
-          echo "❌ Error: Custom path image not loaded correctly"
+          echo "❌ Error: Custom image-file image not loaded correctly"
           exit 1
         fi
         
-        echo "✅ Custom path test passed"
+        # Verify the file was created at the specified location
+        if [ ! -f "./custom-download/busybox-custom.tar" ]; then
+          echo "❌ Error: Image file not found at specified location"
+          exit 1
+        fi
+        
+        echo "✅ Custom image-file test passed"
     
     - name: Test image verification
       run: |
@@ -121,16 +127,20 @@ jobs:
         echo "## Test Results 🧪" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "✅ Basic usage test: PASSED" >> $GITHUB_STEP_SUMMARY
-        echo "✅ Custom image path test: PASSED" >> $GITHUB_STEP_SUMMARY
+        echo "✅ Custom image-file test: PASSED" >> $GITHUB_STEP_SUMMARY
         echo "✅ Image verification test: PASSED" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "### Loaded Images" >> $GITHUB_STEP_SUMMARY
         echo "- Basic test: \`${{ steps.test-basic.outputs.loaded-image }}\` (ID: ${{ steps.test-basic.outputs.image-id }})" >> $GITHUB_STEP_SUMMARY
-        echo "- Custom path test: \`${{ steps.test-custom.outputs.loaded-image }}\` (ID: ${{ steps.test-custom.outputs.image-id }})" >> $GITHUB_STEP_SUMMARY
+        echo "- Custom image-file test: \`${{ steps.test-custom.outputs.loaded-image }}\` (ID: ${{ steps.test-custom.outputs.image-id }})" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "### File Details" >> $GITHUB_STEP_SUMMARY
         echo "- Basic test file size: ${{ steps.test-basic.outputs.file-size }} bytes" >> $GITHUB_STEP_SUMMARY
         echo "- Custom test file size: ${{ steps.test-custom.outputs.file-size }} bytes" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Additional Tests" >> $GITHUB_STEP_SUMMARY
+        echo "- Error handling test: See separate job" >> $GITHUB_STEP_SUMMARY
+        echo "- Skip download test: See separate job" >> $GITHUB_STEP_SUMMARY
 
   test-error-handling:
     runs-on: ubuntu-latest
@@ -154,3 +164,72 @@ jobs:
         fi
         
         echo "✅ Error handling test passed - action correctly failed with non-existent artifact"
+
+  test-skip-download:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Create pre-existing image file
+      run: |
+        # Pull and save an image to simulate a pre-existing file
+        docker pull alpine:latest
+        mkdir -p ./pre-existing
+        docker save alpine:latest -o ./pre-existing/alpine.tar
+        docker rmi alpine:latest
+    
+    - name: Test skip download functionality
+      id: test-skip-download
+      uses: ./load-docker-image
+      with:
+        download: 'false'
+        image-file: './pre-existing/alpine.tar'
+        image-name: 'alpine'
+        tag: 'latest'
+    
+    - name: Verify skip download test
+      run: |
+        echo "Skip download loaded image: ${{ steps.test-skip-download.outputs.loaded-image }}"
+        
+        # Verify alpine image is loaded
+        if ! docker images | grep -q "alpine.*latest"; then
+          echo "❌ Error: Skip download image not loaded correctly"
+          exit 1
+        fi
+        
+        # Verify outputs are not empty
+        if [ -z "${{ steps.test-skip-download.outputs.loaded-image }}" ]; then
+          echo "❌ Error: loaded-image output is empty"
+          exit 1
+        fi
+        
+        if [ -z "${{ steps.test-skip-download.outputs.image-id }}" ]; then
+          echo "❌ Error: image-id output is empty"
+          exit 1
+        fi
+        
+        if [ -z "${{ steps.test-skip-download.outputs.file-size }}" ]; then
+          echo "❌ Error: file-size output is empty"
+          exit 1
+        fi
+        
+        echo "✅ Skip download test passed"
+    
+    - name: Test skip download with missing file (should fail)
+      id: test-skip-download-error
+      continue-on-error: true
+      uses: ./load-docker-image
+      with:
+        download: 'false'
+        image-file: './non-existent/missing.tar'
+    
+    - name: Verify skip download error handling
+      run: |
+        if [ "${{ steps.test-skip-download-error.outcome }}" = "success" ]; then
+          echo "❌ Error: Action should have failed with missing file when download=false"
+          exit 1
+        fi
+        
+        echo "✅ Skip download error handling test passed - action correctly failed with missing file"
