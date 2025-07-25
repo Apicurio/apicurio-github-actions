@@ -26,6 +26,7 @@ jobs:
       with:
         image-name: 'nginx'
         tag: 'alpine'
+        artifact-name: 'nginx-alpine-basic'
     
     - name: Verify basic test output
       run: |
@@ -53,6 +54,7 @@ jobs:
         image-name: 'nginx'
         tag: 'alpine'
         output-path: './custom/nginx-alpine.tar'
+        artifact-name: 'nginx-alpine-custom'
     
     - name: Verify custom path test
       run: |
@@ -94,19 +96,8 @@ jobs:
       with:
         image-name: 'nginx'
         tag: 'alpine'
-        artifact-name: 'test-nginx-artifact'
+        artifact-name: 'nginx-alpine-artifact'
         artifact-retention-days: 1
-    
-    - name: Upload additional test artifacts
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: manual-test-artifacts
-        path: |
-          ${{ steps.test-basic.outputs.saved-path }}
-          ${{ steps.test-custom.outputs.saved-path }}
-          ${{ steps.test-no-artifact.outputs.saved-path }}
-        retention-days: 1
     
     - name: Test summary
       run: |
@@ -122,13 +113,7 @@ jobs:
         echo "- Basic test file: \`${{ steps.test-basic.outputs.saved-path }}\` (${{ steps.test-basic.outputs.file-size }} bytes)" >> $GITHUB_STEP_SUMMARY
         echo "- Custom path file: \`${{ steps.test-custom.outputs.saved-path }}\` (${{ steps.test-custom.outputs.file-size }} bytes)" >> $GITHUB_STEP_SUMMARY
         echo "- Artifact test file: \`${{ steps.test-artifact.outputs.saved-path }}\` (${{ steps.test-artifact.outputs.file-size }} bytes)" >> $GITHUB_STEP_SUMMARY
-        echo "- No-artifact test file: \`${{ steps.test-no-artifact.outputs.saved-path }}\` (${{ steps.test-no-artifact.outputs.file-size }} bytes)" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        echo "### Artifacts Created" >> $GITHUB_STEP_SUMMARY
-        echo "- \`docker-image\` (from basic test - auto-uploaded)" >> $GITHUB_STEP_SUMMARY
-        echo "- \`docker-image\` (from custom path test - auto-uploaded)" >> $GITHUB_STEP_SUMMARY
-        echo "- \`test-nginx-artifact\` (from artifact test - auto-uploaded)" >> $GITHUB_STEP_SUMMARY
-        echo "- \`manual-test-artifacts\` (manually uploaded test files)" >> $GITHUB_STEP_SUMMARY
 
   test-error-handling:
     runs-on: ubuntu-latest
