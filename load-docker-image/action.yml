@@ -1,0 +1,143 @@
+name: 'Load Docker Image'
+description: 'Download and load a Docker image from an artifact created by save-docker-image'
+author: 'Apicurio'
+branding:
+  icon: 'download'
+  color: 'green'
+
+inputs:
+  artifact-name:
+    description: 'Name of the artifact containing the Docker image'
+    required: false
+    default: 'docker-image'
+  image-path:
+    description: 'Path where the Docker image tar file will be downloaded to'
+    required: false
+    default: '.'
+  image-name:
+    description: 'Expected name of the Docker image (for verification)'
+    required: false
+  tag:
+    description: 'Expected tag of the Docker image (for verification)'
+    required: false
+    default: 'latest'
+  minikube:
+    description: 'Load the Docker image into minikube as well'
+    required: false
+    default: 'false'
+
+outputs:
+  loaded-image:
+    description: 'Name and tag of the loaded Docker image'
+    value: ${{ steps.load-image.outputs.loaded-image }}
+  image-id:
+    description: 'ID of the loaded Docker image'
+    value: ${{ steps.load-image.outputs.image-id }}
+  file-size:
+    description: 'Size of the Docker image file in bytes'
+    value: ${{ steps.load-image.outputs.file-size }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Download Docker Image Artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: ${{ inputs.artifact-name }}
+        path: ${{ inputs.image-path }}
+    
+    - name: Load Docker Image
+      id: load-image
+      shell: bash
+      run: |
+        IMAGE="${{ inputs.image-path }}/${{ inputs.artifact-name }}"
+        EXPECTED_NAME="${{ inputs.image-name }}"
+        EXPECTED_TAG="${{ inputs.tag }}"
+        
+        echo "Loading Docker image from: ${IMAGE}"
+        
+        # Check if the tar file exists
+        if [ ! -f "${IMAGE}" ]; then
+          echo "❌ Docker image file not found: ${IMAGE}"
+          exit 1
+        fi
+        
+        # Get file size
+        FILE_SIZE=$(stat -c%s "${IMAGE}" 2>/dev/null || stat -f%z "${IMAGE}" 2>/dev/null || echo "unknown")
+        echo "📊 File size: ${FILE_SIZE} bytes"
+        
+        # Load the Docker image
+        echo "Loading Docker image..."
+        LOAD_OUTPUT=$(docker load -i "${IMAGE}" 2>&1)
+        LOAD_EXIT_CODE=$?
+        
+        if [ $LOAD_EXIT_CODE -eq 0 ]; then
+          echo "✅ Successfully loaded Docker image"
+          echo "${LOAD_OUTPUT}"
+          
+          # Extract the loaded image name from docker load output
+          # Docker load output format: "Loaded image: image:tag" or "Loaded image ID: sha256:..."
+          LOADED_IMAGE=$(echo "${LOAD_OUTPUT}" | grep -E "Loaded image:" | sed 's/Loaded image: //' | head -1)
+          
+          if [ -z "${LOADED_IMAGE}" ]; then
+            # Try to extract image ID if no image name found
+            IMAGE_ID=$(echo "${LOAD_OUTPUT}" | grep -E "Loaded image ID:" | sed 's/Loaded image ID: //' | head -1)
+            if [ -n "${IMAGE_ID}" ]; then
+              LOADED_IMAGE="${IMAGE_ID}"
+              echo "📋 Loaded image ID: ${IMAGE_ID}"
+            else
+              echo "⚠️  Could not determine loaded image name or ID"
+              LOADED_IMAGE="unknown"
+            fi
+          else
+            echo "📋 Loaded image: ${LOADED_IMAGE}"
+            
+            # Get image ID for the loaded image
+            IMAGE_ID=$(docker images --format "{{.ID}}" "${LOADED_IMAGE}" | head -1)
+            if [ -n "${IMAGE_ID}" ]; then
+              echo "📋 Image ID: ${IMAGE_ID}"
+            fi
+          fi
+          
+          # Verify expected image name and tag if provided
+          if [ -n "${EXPECTED_NAME}" ]; then
+            EXPECTED_FULL_NAME="${EXPECTED_NAME}:${EXPECTED_TAG}"
+            if echo "${LOADED_IMAGE}" | grep -q "${EXPECTED_FULL_NAME}"; then
+              echo "✅ Loaded image matches expected name: ${EXPECTED_FULL_NAME}"
+            else
+              echo "⚠️  Loaded image (${LOADED_IMAGE}) does not match expected name (${EXPECTED_FULL_NAME})"
+            fi
+          fi
+          
+          # Set outputs
+          echo "loaded-image=${LOADED_IMAGE}" >> $GITHUB_OUTPUT
+          echo "image-id=${IMAGE_ID:-unknown}" >> $GITHUB_OUTPUT
+          echo "file-size=${FILE_SIZE}" >> $GITHUB_OUTPUT
+          
+          # Load image into minikube if requested
+          if [ "${{ inputs.minikube }}" = "true" ]; then
+            echo ""
+            echo "🚀 Loading image into minikube..."
+            MINIKUBE_LOAD_OUTPUT=$(minikube image load "${LOADED_IMAGE}" 2>&1)
+            MINIKUBE_EXIT_CODE=$?
+            
+            if [ $MINIKUBE_EXIT_CODE -eq 0 ]; then
+              echo "✅ Successfully loaded image into minikube"
+              echo "${MINIKUBE_LOAD_OUTPUT}"
+            else
+              echo "❌ Failed to load image into minikube"
+              echo "${MINIKUBE_LOAD_OUTPUT}"
+              exit 1
+            fi
+          fi
+          
+          # List loaded images for verification
+          echo ""
+          echo "📋 Current Docker images:"
+          docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.Size}}"
+          
+        else
+          echo "❌ Failed to load Docker image"
+          echo "${LOAD_OUTPUT}"
+          exit 1
+        fi
