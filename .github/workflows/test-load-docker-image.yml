@@ -80,7 +80,7 @@ jobs:
     - name: Upload custom path test image
       uses: actions/upload-artifact@v4
       with:
-        name: custom-image
+        name: busybox.tar
         path: custom-path/busybox.tar
         retention-days: 1
     
@@ -91,7 +91,7 @@ jobs:
       id: test-custom
       uses: ./load-docker-image
       with:
-        artifact-name: 'custom-image'
+        artifact-name: 'busybox.tar'
         image-path: './custom-download'
         image-name: 'busybox'
         tag: 'latest'
