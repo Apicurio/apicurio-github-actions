@@ -62,7 +62,7 @@ Once a release is created with a proper tag:
    ```
 3. **Usage Reference**: Users can reference it as:
    ```yaml
-   uses: apicurio/apicurio-github-actions/save-docker-image@v1
+   uses: apicurio/apicurio-github-actions/save-docker-image@v2
    ```
 
 ## 📦 Version Management
@@ -80,8 +80,8 @@ The release workflow automatically creates/updates major version tags:
 
 This allows users to reference stable major versions:
 ```yaml
-uses: apicurio/apicurio-github-actions/save-docker-image@v1  # Always latest v1.x.x
-uses: apicurio/apicurio-github-actions/save-docker-image@v1.0.0  # Specific version
+uses: apicurio/apicurio-github-actions/save-docker-image@v2  # Always latest v2.x.x
+uses: apicurio/apicurio-github-actions/save-docker-image@v2.0.0  # Specific version
 ```
 
 ## 🔍 Action Structure

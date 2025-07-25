@@ -13,7 +13,7 @@ Save a Docker image to a tar file for later use, caching, or distribution.
 **Usage:**
 ```yaml
 - name: Save Docker Image
-  uses: apicurio/apicurio-github-actions/save-docker-image@v1
+  uses: apicurio/apicurio-github-actions/save-docker-image@v2
   with:
     image-name: 'my-app'
     tag: 'latest'

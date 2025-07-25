@@ -18,7 +18,7 @@ A GitHub Action to download and load a Docker image from an artifact created by 
 
 ```yaml
 - name: Load Docker Image
-  uses: apicurio/apicurio-github-actions/load-docker-image@v1
+  uses: apicurio/apicurio-github-actions/load-docker-image@v2
   with:
     artifact-name: 'docker-image'
 ```
@@ -27,7 +27,7 @@ A GitHub Action to download and load a Docker image from an artifact created by 
 
 ```yaml
 - name: Load Docker Image
-  uses: apicurio/apicurio-github-actions/load-docker-image@v1
+  uses: apicurio/apicurio-github-actions/load-docker-image@v2
   with:
     artifact-name: 'my-app-image'
     image-file: './images/my-app.tar'
@@ -39,7 +39,7 @@ A GitHub Action to download and load a Docker image from an artifact created by 
 
 ```yaml
 - name: Load Docker Image from Existing File
-  uses: apicurio/apicurio-github-actions/load-docker-image@v1
+  uses: apicurio/apicurio-github-actions/load-docker-image@v2
   with:
     download: 'false'
     image-file: './pre-existing/my-app.tar'
@@ -69,7 +69,7 @@ jobs:
         docker build -t my-app:latest .
     
     - name: Save Docker image
-      uses: apicurio/apicurio-github-actions/save-docker-image@v1
+      uses: apicurio/apicurio-github-actions/save-docker-image@v2
       with:
         image-name: 'my-app'
         tag: 'latest'
@@ -82,7 +82,7 @@ jobs:
     steps:
     - name: Load Docker image
       id: load-image
-      uses: apicurio/apicurio-github-actions/load-docker-image@v1
+      uses: apicurio/apicurio-github-actions/load-docker-image@v2
       with:
         artifact-name: 'my-app-docker-image'
         image-name: 'my-app'
@@ -129,7 +129,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Build and save image
-      uses: apicurio/apicurio-github-actions/save-docker-image@v1
+      uses: apicurio/apicurio-github-actions/save-docker-image@v2
       with:
         image-name: 'my-app'
         artifact-name: 'my-app-docker-image'
@@ -139,7 +139,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Load Docker image
-      uses: apicurio/apicurio-github-actions/load-docker-image@v1
+      uses: apicurio/apicurio-github-actions/load-docker-image@v2
       with:
         artifact-name: 'my-app-docker-image'
     
@@ -151,7 +151,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Load Docker image
-      uses: apicurio/apicurio-github-actions/load-docker-image@v1
+      uses: apicurio/apicurio-github-actions/load-docker-image@v2
       with:
         artifact-name: 'my-app-docker-image'
     
@@ -168,7 +168,7 @@ Verify that the loaded image matches expectations:
 ```yaml
 - name: Load and verify Docker image
   id: load-image
-  uses: apicurio/apicurio-github-actions/load-docker-image@v1
+  uses: apicurio/apicurio-github-actions/load-docker-image@v2
   with:
     artifact-name: 'production-image'
     image-name: 'my-app'
@@ -197,7 +197,7 @@ runs-on: ${{ matrix.os }}
 
 steps:
 - name: Load Docker image
-  uses: apicurio/apicurio-github-actions/load-docker-image@v1
+  uses: apicurio/apicurio-github-actions/load-docker-image@v2
   with:
     artifact-name: 'cross-platform-image'
 ```
@@ -218,7 +218,7 @@ Load images only when needed:
 
 - name: Load Docker image if not exists
   if: steps.check-image.outputs.exists == 'false'
-  uses: apicurio/apicurio-github-actions/load-docker-image@v1
+  uses: apicurio/apicurio-github-actions/load-docker-image@v2
   with:
     artifact-name: 'my-app-docker-image'
 ```
@@ -229,14 +229,14 @@ Load multiple Docker images in a single job:
 
 ```yaml
 - name: Load application image
-  uses: apicurio/apicurio-github-actions/load-docker-image@v1
+  uses: apicurio/apicurio-github-actions/load-docker-image@v2
   with:
     artifact-name: 'app-image'
     image-file: './images/app.tar'
     image-name: 'my-app'
 
 - name: Load database image
-  uses: apicurio/apicurio-github-actions/load-docker-image@v1
+  uses: apicurio/apicurio-github-actions/load-docker-image@v2
   with:
     artifact-name: 'db-image'
     image-file: './images/db.tar'
@@ -254,7 +254,7 @@ Organize Docker images in specific directories:
 
 ```yaml
 - name: Load Docker Image to Custom Location
-  uses: apicurio/apicurio-github-actions/load-docker-image@v1
+  uses: apicurio/apicurio-github-actions/load-docker-image@v2
   with:
     artifact-name: 'my-app-image'
     image-file: './build/artifacts/images/my-app-v1.2.3.tar'
@@ -273,7 +273,7 @@ Use when you already have the image file and want to skip the download step:
     cp /external/path/my-app.tar ./my-app.tar
 
 - name: Load existing Docker image
-  uses: apicurio/apicurio-github-actions/load-docker-image@v1
+  uses: apicurio/apicurio-github-actions/load-docker-image@v2
   with:
     download: 'false'
     image-file: './my-app.tar'
@@ -297,14 +297,14 @@ Download only if the image file doesn't already exist:
 
 - name: Load from cache (skip download)
   if: steps.check-file.outputs.exists == 'true'
-  uses: apicurio/apicurio-github-actions/load-docker-image@v1
+  uses: apicurio/apicurio-github-actions/load-docker-image@v2
   with:
     download: 'false'
     image-file: './cache/my-app.tar'
 
 - name: Download and load image
   if: steps.check-file.outputs.exists == 'false'
-  uses: apicurio/apicurio-github-actions/load-docker-image@v1
+  uses: apicurio/apicurio-github-actions/load-docker-image@v2
   with:
     artifact-name: 'my-app-image'
     image-file: './cache/my-app.tar'
@@ -350,7 +350,7 @@ This action is designed to work seamlessly with the `save-docker-image` action:
 ```yaml
 # Job 1: Save image
 - name: Save Docker image
-  uses: apicurio/apicurio-github-actions/save-docker-image@v1
+  uses: apicurio/apicurio-github-actions/save-docker-image@v2
   with:
     image-name: 'my-app'
     tag: 'v1.0.0'
@@ -358,7 +358,7 @@ This action is designed to work seamlessly with the `save-docker-image` action:
 
 # Job 2: Load image (in different job/workflow)
 - name: Load Docker image
-  uses: apicurio/apicurio-github-actions/load-docker-image@v1
+  uses: apicurio/apicurio-github-actions/load-docker-image@v2
   with:
     artifact-name: 'my-app-image'  # Same as save action
     image-name: 'my-app'           # Same as save action

@@ -19,7 +19,7 @@ A GitHub Action to save a Docker image to a tar file for later use, caching, or 
 
 ```yaml
 - name: Save Docker Image
-  uses: apicurio/apicurio-github-actions/save-docker-image@v1
+  uses: apicurio/apicurio-github-actions/save-docker-image@v2
   with:
     image-name: 'nginx'
 ```
@@ -28,7 +28,7 @@ A GitHub Action to save a Docker image to a tar file for later use, caching, or 
 
 ```yaml
 - name: Save Docker Image
-  uses: apicurio/apicurio-github-actions/save-docker-image@v1
+  uses: apicurio/apicurio-github-actions/save-docker-image@v2
   with:
     image-name: 'my-app'
     tag: 'v1.2.3'
@@ -58,7 +58,7 @@ jobs:
     
     - name: Save Docker image
       id: save-image
-      uses: apicurio/apicurio-github-actions/save-docker-image@v1
+      uses: apicurio/apicurio-github-actions/save-docker-image@v2
       with:
         image-name: 'my-app'
         tag: 'latest'
@@ -102,7 +102,7 @@ Save built images to avoid rebuilding in subsequent workflow runs:
 
 ```yaml
 - name: Save Docker image for caching
-  uses: apicurio/apicurio-github-actions/save-docker-image@v1
+  uses: apicurio/apicurio-github-actions/save-docker-image@v2
   with:
     image-name: 'my-app'
     output-path: './cache/my-app.tar'
@@ -120,7 +120,7 @@ The action automatically uploads the saved Docker image as an artifact (enabled 
 
 ```yaml
 - name: Save and upload Docker image
-  uses: apicurio/apicurio-github-actions/save-docker-image@v1
+  uses: apicurio/apicurio-github-actions/save-docker-image@v2
   with:
     image-name: 'my-app'
     artifact-name: 'my-app-image'
@@ -131,7 +131,7 @@ To disable automatic artifact upload:
 
 ```yaml
 - name: Save Docker image (no upload)
-  uses: apicurio/apicurio-github-actions/save-docker-image@v1
+  uses: apicurio/apicurio-github-actions/save-docker-image@v2
   with:
     image-name: 'my-app'
     upload: 'false'
@@ -147,7 +147,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Build and save image
-      uses: apicurio/apicurio-github-actions/save-docker-image@v1
+      uses: apicurio/apicurio-github-actions/save-docker-image@v2
       with:
         image-name: 'my-app'
         artifact-name: 'my-app-docker-image'
@@ -172,7 +172,7 @@ Include Docker images as release artifacts:
 
 ```yaml
 - name: Save release image
-  uses: apicurio/apicurio-github-actions/save-docker-image@v1
+  uses: apicurio/apicurio-github-actions/save-docker-image@v2
   with:
     image-name: 'my-app'
     tag: ${{ github.ref_name }}
