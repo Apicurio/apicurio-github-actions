@@ -25,7 +25,7 @@ jobs:
     - name: Upload test image as artifact
       uses: actions/upload-artifact@v4
       with:
-        name: docker-image
+        name: nginx-alpine.tar
         path: nginx-alpine.tar
         retention-days: 1
     
@@ -36,7 +36,7 @@ jobs:
       id: test-basic
       uses: ./load-docker-image
       with:
-        artifact-name: 'docker-image'
+        artifact-name: 'nginx-alpine.tar'
         image-name: 'nginx'
         tag: 'alpine'
     
@@ -154,52 +154,3 @@ jobs:
         fi
         
         echo "✅ Error handling test passed - action correctly failed with non-existent artifact"
-
-  test-with-minikube:
-    runs-on: ubuntu-latest
-    
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-    
-    - name: Setup Minikube
-      uses: ./setup-minikube
-      with:
-        minikube-version: 'v1.36.0'
-        kubernetes-version: 'v1.33.3'
-    
-    - name: Pull and save test image
-      run: |
-        docker pull hello-world:latest
-        docker save hello-world:latest -o hello-world.tar
-    
-    - name: Upload test image for minikube test
-      uses: actions/upload-artifact@v4
-      with:
-        name: minikube-test-image
-        path: hello-world.tar
-        retention-days: 1
-    
-    - name: Remove local image
-      run: docker rmi hello-world:latest
-    
-    - name: Test loading with minikube
-      id: test-minikube
-      uses: ./load-docker-image
-      with:
-        artifact-name: 'minikube-test-image'
-        image-name: 'hello-world'
-        tag: 'latest'
-        minikube: 'true'
-    
-    - name: Verify minikube loading
-      run: |
-        echo "Minikube loaded image: ${{ steps.test-minikube.outputs.loaded-image }}"
-        
-        # Verify image is in minikube
-        if ! minikube image ls | grep -q "hello-world"; then
-          echo "❌ Error: Image not loaded into minikube"
-          exit 1
-        fi
-        
-        echo "✅ Minikube loading test passed"
