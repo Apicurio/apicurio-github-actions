@@ -38,13 +38,13 @@ inputs:
 outputs:
   minikube-status:
     description: 'Status of the Minikube cluster'
-    value: ${{ steps.setup-minikube.outputs.minikube-status }}
+    value: ${{ steps.minikube-info.outputs.minikube-status }}
   kubernetes-version:
     description: 'Version of Kubernetes running in Minikube'
-    value: ${{ steps.setup-minikube.outputs.kubernetes-version }}
+    value: ${{ steps.minikube-info.outputs.kubernetes-version }}
   cluster-ip:
     description: 'IP address of the Minikube cluster'
-    value: ${{ steps.setup-minikube.outputs.cluster-ip }}
+    value: ${{ steps.minikube-info.outputs.cluster-ip }}
 
 runs:
   using: 'composite'
