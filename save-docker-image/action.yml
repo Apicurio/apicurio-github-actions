@@ -24,7 +24,7 @@ inputs:
   artifact-retention-days:
     description: 'Number of days to retain the artifact'
     required: false
-    default: '7'
+    default: '2'
   upload:
     description: 'Whether to upload the saved image as an artifact'
     required: false
