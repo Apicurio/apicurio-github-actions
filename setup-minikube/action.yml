@@ -11,13 +11,21 @@ inputs:
     required: false
     default: 'false'
   olm-enable:
-    description: 'Install OLM'
+    description: 'Install OLM v0'
     required: false
     default: 'false'
   olm-version:
-    description: 'OLM version to install'
+    description: 'OLM v0 version to install'
     required: false
     default: '0.32.0'
+  olm-v1-enable:
+    description: 'Install OLM v1'
+    required: false
+    default: 'false'
+  olm-v1-version:
+    description: 'OLM v1 version to install'
+    required: false
+    default: '1.3.0'
   minikube-version:
     description: 'Minikube version to use'
     required: false
@@ -78,7 +86,7 @@ runs:
         echo "🔍 Minikube status: ${MINIKUBE_STATUS}"
         
         # Get Kubernetes version
-        K8S_VERSION=$(kubectl version --short --client=false 2>/dev/null | grep "Server Version" | awk '{print $3}' || echo "unknown")
+        K8S_VERSION=$(kubectl version 2>/dev/null | grep "Server Version" | awk '{print $3}' || echo "unknown")
         echo "kubernetes-version=${K8S_VERSION}" >> $GITHUB_OUTPUT
         echo "🔍 Kubernetes version: ${K8S_VERSION}"
         
@@ -97,21 +105,15 @@ runs:
       shell: bash
       run: |
         echo "🚀 Enabling Ingress addon..."
-        minikube addons enable ingress
-        
-        echo "⏳ Waiting for Ingress controller to be ready..."
-        kubectl wait --namespace ingress-nginx \
-          --for=condition=ready pod \
-          --selector=app.kubernetes.io/component=controller \
-          --timeout=300s || echo "⚠️  Ingress controller may not be fully ready"
-        
+        # This sometimes fails - leaving the debug in place in case that happens again.
+        minikube --alsologtostderr --v=2 addons enable ingress
         echo "✅ Ingress addon enabled"
 
-    - name: Install OLM
+    - name: Install OLM v0
       if: inputs.olm-enable == 'true'
       shell: bash
       run: |
-        echo "🚀 Installing OLM (Operator Lifecycle Manager)..."
+        echo "🚀 Installing OLM (Operator Lifecycle Manager) v0..."
         echo "📦 OLM Version: ${{ inputs.olm-version }}"
         
         # Download and install OLM
@@ -124,6 +126,21 @@ runs:
         kubectl wait --for=condition=ready pod -l app=olm-operator --namespace=olm --timeout=300s || echo "⚠️  OLM may not be fully ready"
         kubectl wait --for=condition=ready pod -l app=catalog-operator --namespace=olm --timeout=300s || echo "⚠️  Catalog operator may not be fully ready"
         
+        echo "✅ OLM installation completed"
+
+    - name: Install OLM v1
+      if: inputs.olm-v1-enable == 'true'
+      shell: bash
+      run: |
+        echo "🚀 Installing OLM (Operator Lifecycle Manager) v1..."
+        echo "📦 OLM Version: ${{ inputs.olm-v1-version }}"
+
+        # Download and install OLM
+        curl -L https://github.com/operator-framework/operator-controller/releases/download/v${{ inputs.olm-v1-version }}/install.sh -o install-olm.sh
+        chmod +x install-olm.sh
+        ./install-olm.sh
+        rm install-olm.sh
+
         echo "✅ OLM installation completed"
 
     - name: Setup Minikube tunnel
