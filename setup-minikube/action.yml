@@ -57,6 +57,7 @@ outputs:
 runs:
   using: 'composite'
   steps:
+
     - name: Enable port-forwarding
       shell: bash
       run: |
@@ -65,8 +66,53 @@ runs:
         sudo apt-get -y install socat
         echo "✅ Port-forwarding support enabled"
 
-    - name: Setup Minikube
-      id: setup-minikube
+    # Setup Minikube sometimes fails:
+    #
+    # ```
+    # data: {
+    #   message: "API rate limit exceeded for 52.173.162.97. (But here's the good news: Authenticated requests get a higher rate limit. Check out the documentation for more details.)",
+    #   documentation_url: 'https://docs.github.com/rest/overview/resources-in-the-rest-api#rate-limiting'
+    # }
+    # ```
+    #
+    # I've added 3 retries:
+    - name: Setup Minikube \#1
+      id: setup-minikube-1
+      uses: manusa/actions-setup-minikube@v2.13.0
+      with:
+        driver: ${{ inputs.driver }}
+        minikube version: ${{ inputs.minikube-version }}
+        kubernetes version: ${{ inputs.kubernetes-version }}
+        start args: ${{ inputs.start-args }}
+      continue-on-error: true
+
+    - name: Wait for retry \#2
+      if: steps.setup-minikube-1.outcome == 'failure'
+      shell: bash
+      run: |
+        echo "⚠️ Setup Minikube attempt #1 failed. Waiting to retry..."
+        sleep 120s
+
+    - name: Setup Minikube \#2
+      id: setup-minikube-2
+      if: steps.setup-minikube-1.outcome == 'failure'
+      uses: manusa/actions-setup-minikube@v2.13.0
+      with:
+        driver: ${{ inputs.driver }}
+        minikube version: ${{ inputs.minikube-version }}
+        kubernetes version: ${{ inputs.kubernetes-version }}
+        start args: ${{ inputs.start-args }}
+      continue-on-error: true
+
+    - name: Wait for retry \#3
+      if: steps.setup-minikube-2.outcome == 'failure'
+      shell: bash
+      run: |
+        echo "⚠️ Setup Minikube attempt #2 failed. Waiting to retry..."
+        sleep 240s
+
+    - name: Setup Minikube \#3 (last retry)
+      if: steps.setup-minikube-2.outcome == 'failure'
       uses: manusa/actions-setup-minikube@v2.13.0
       with:
         driver: ${{ inputs.driver }}
