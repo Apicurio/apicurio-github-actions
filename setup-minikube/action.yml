@@ -100,14 +100,24 @@ runs:
         echo "📋 Cluster Information:"
         kubectl cluster-info || echo "⚠️  Could not retrieve cluster info"
 
+    # This sometimes fails:
+    # ```
+    # data: {
+    #   message: "API rate limit exceeded for 52.173.162.97. (But here's the good news: Authenticated requests get a higher rate limit. Check out the documentation for more details.)",
+    #   documentation_url: 'https://docs.github.com/rest/overview/resources-in-the-rest-api#rate-limiting'
+    # }
+    # ```
     - name: Enable Ingress
       if: inputs.ingress-enable == 'true'
-      shell: bash
-      run: |
-        echo "🚀 Enabling Ingress addon..."
-        # This sometimes fails - leaving the debug in place in case that happens again.
-        minikube --alsologtostderr --v=2 addons enable ingress
-        echo "✅ Ingress addon enabled"
+      uses: nick-fields/retry@v3
+      with:
+        retry_on: error
+        retry_wait_seconds: 120
+        max_attempts: 5
+        command: |
+          echo "🚀 Enabling Ingress addon..."
+          minikube --alsologtostderr --v=2 addons enable ingress
+          echo "✅ Ingress addon enabled"
 
     - name: Install OLM v0
       if: inputs.olm-enable == 'true'
