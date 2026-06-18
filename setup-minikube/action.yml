@@ -29,7 +29,7 @@ inputs:
   minikube-version:
     description: 'Minikube version to use (without v prefix)'
     required: false
-    default: '1.36.0'
+    default: '1.38.1'
   kubernetes-version:
     description: 'Kubernetes version to use'
     required: false
