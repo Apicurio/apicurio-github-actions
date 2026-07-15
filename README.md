@@ -1,5 +1,6 @@
 ![Release Workflow](https://github.com/Apicurio/apicurio-github-actions/workflows/Release%20Workflow/badge.svg)
 [![Automated Release Notes by gren](https://img.shields.io/badge/%F0%9F%A4%96-release%20notes-00B2EE.svg)](https://github-tools.github.io/github-release-notes/)
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2FApicurio%2Fapicurio-github-actions.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2FApicurio%2Fapicurio-github-actions?ref=badge_shield)
 
 # apicurio-github-actions
 A repository to hold custom GitHub Actions used for Apicurio projects.
@@ -43,3 +44,7 @@ Each action includes automated tests that run on:
 - Manual workflow dispatch
 
 Run tests locally or view results in the Actions tab.
+
+
+## License
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2FApicurio%2Fapicurio-github-actions.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2FApicurio%2Fapicurio-github-actions?ref=badge_large)
