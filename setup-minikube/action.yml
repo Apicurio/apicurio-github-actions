@@ -58,13 +58,14 @@ runs:
   using: 'composite'
   steps:
 
-    - name: Enable port-forwarding
+    - name: Enable port-forwarding and initialize CNI directories
       shell: bash
       run: |
-        echo "🔧 Installing socat for port-forwarding..."
+        echo "🔧 Installing socat and preparing CNI directories..."
+        sudo mkdir -p /etc/cni/net.d /opt/cni/bin
         sudo apt-get update -qq
         sudo apt-get -y install socat
-        echo "✅ Port-forwarding support enabled"
+        echo "✅ Port-forwarding and CNI setup enabled"
 
     - name: Setup Minikube
       uses: medyagh/setup-minikube@latest
