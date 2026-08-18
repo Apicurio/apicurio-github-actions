@@ -66,6 +66,12 @@ runs:
         sudo apt-get -y install socat
         echo "✅ Port-forwarding support enabled"
 
+    - name: Create CNI config directory
+      if: inputs.driver == 'none'
+      shell: bash
+      run: |
+        sudo mkdir -p /etc/cni/net.d
+
     - name: Setup Minikube
       uses: medyagh/setup-minikube@latest
       with:
