@@ -61,10 +61,26 @@ runs:
     - name: Enable port-forwarding
       shell: bash
       run: |
+        if command -v socat >/dev/null 2>&1; then
+          echo "✅ socat already installed, port-forwarding support enabled"
+          exit 0
+        fi
         echo "🔧 Installing socat for port-forwarding..."
-        sudo apt-get update -qq
-        sudo apt-get -y install socat
-        echo "✅ Port-forwarding support enabled"
+        # Hosted runners sometimes run apt (e.g. unattended upgrades) in the background at
+        # boot. Wait for its lock instead of failing, and bound each attempt so a stuck
+        # mirror cannot consume the caller's whole step timeout.
+        APT_OPTS=(-o DPkg::Lock::Timeout=300 -o Acquire::Retries=3 -o Acquire::http::Timeout=30)
+        for attempt in 1 2 3; do
+          if sudo timeout 240 apt-get "${APT_OPTS[@]}" update -qq \
+              && sudo timeout 240 apt-get "${APT_OPTS[@]}" -y install socat; then
+            echo "✅ Port-forwarding support enabled"
+            exit 0
+          fi
+          echo "⚠️ socat install attempt ${attempt} failed, retrying..."
+          sleep 10
+        done
+        echo "❌ Failed to install socat"
+        exit 1
 
     - name: Create CNI config directory
       if: inputs.driver == 'none'
