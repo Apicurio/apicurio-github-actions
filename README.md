@@ -19,6 +19,10 @@ Save a Docker image to a tar file for later use, caching, or distribution.
     output-path: './my-app.tar'
 ```
 
+### 🔔 [Notify Slack](./notify-slack)
+Post a notification to the Apicurio Slack important or general channel, mentioning its owner.
+See its [README](./notify-slack/README.md) for usage and the Slack setup it expects.
+
 ## Publishing to GitHub Actions Marketplace
 
 To publish these actions to the GitHub Actions Marketplace:
