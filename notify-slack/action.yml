@@ -1,0 +1,72 @@
+name: 'Notify Slack'
+description: 'Post a notification to the Apicurio Slack important or general channel, mentioning its owner'
+author: 'Apicurio'
+branding:
+  icon: 'bell'
+  color: 'purple'
+
+inputs:
+  level:
+    description: 'important (team channel, must be actionable, mentions an owner) or general (information, no mention)'
+    required: true
+  text:
+    description: 'Message text'
+    required: true
+  link:
+    description: 'Link appended on its own line, usually the workflow run'
+    required: false
+    default: ''
+  mention:
+    description: 'GitHub logins in priority order, comma-separated; the first with a Slack mapping is mentioned. important only'
+    required: false
+    default: ''
+  user-map:
+    description: 'JSON object mapping GitHub logins to Slack member IDs, usually secrets.SLACK_USER_MAP'
+    required: false
+    default: ''
+  important-webhook:
+    description: 'Webhook for level important, usually secrets.SLACK_IMPORTANT_NOTIFICATION_WEBHOOK'
+    required: false
+    default: ''
+  general-webhook:
+    description: 'Webhook for level general, usually secrets.SLACK_GENERAL_NOTIFICATION_WEBHOOK'
+    required: false
+    default: ''
+
+runs:
+  using: 'composite'
+  steps:
+    # Inputs reach the script only through env, never interpolated into it, so
+    # message text (often a PR title) cannot inject shell.
+    - name: Post to Slack
+      shell: bash
+      env:
+        LEVEL: ${{ inputs.level }}
+        TEXT: ${{ inputs.text }}
+        LINK: ${{ inputs.link }}
+        MENTION: ${{ inputs.mention }}
+        USER_MAP: ${{ inputs.user-map }}
+        IMPORTANT_WEBHOOK: ${{ inputs.important-webhook }}
+        GENERAL_WEBHOOK: ${{ inputs.general-webhook }}
+      run: |
+        payload=$("$GITHUB_ACTION_PATH/payload.sh")
+
+        if [[ "$LEVEL" == "important" ]]; then
+          webhook=$IMPORTANT_WEBHOOK
+        else
+          webhook=$GENERAL_WEBHOOK
+        fi
+        # Forks and repositories without the secrets.
+        if [[ -z "$webhook" ]]; then
+          echo "::warning::notify-slack: no webhook for level '$LEVEL', not sent"
+          exit 0
+        fi
+
+        # A failed notification is reported, but does not fail the job it
+        # reports on: a release that succeeded stays green.
+        if response=$(curl -sS --fail-with-body --max-time 30 --retry 2 \
+            -X POST -H 'Content-Type: application/json' --data "$payload" "$webhook" 2>&1); then
+          echo "Sent ($LEVEL): $response"
+        else
+          echo "::warning::notify-slack: Slack did not accept the $LEVEL notification: ${response//$'\n'/ }"
+        fi

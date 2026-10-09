@@ -1,0 +1,87 @@
+name: Test Notify Slack Action
+
+on:
+  push:
+    paths:
+      - 'notify-slack/**'
+      - '.github/workflows/test-notify-slack.yml'
+  pull_request:
+    paths:
+      - 'notify-slack/**'
+      - '.github/workflows/test-notify-slack.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test-notify-slack:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Payload tests
+      run: notify-slack/payload.test.sh
+
+    # Stands in for Slack: records each request body, answers with the status
+    # in ./mock-status (200 unless the file says otherwise).
+    - name: Start mock webhook
+      run: |
+        cat > /tmp/mock.py << 'EOF'
+        import http.server, os
+        class Handler(http.server.BaseHTTPRequestHandler):
+            def do_POST(self):
+                body = self.rfile.read(int(self.headers['Content-Length']))
+                with open('/tmp/requests.jsonl', 'ab') as f:
+                    f.write(body + b'\n')
+                status = int(open('/tmp/mock-status').read()) if os.path.exists('/tmp/mock-status') else 200
+                self.send_response(status)
+                self.end_headers()
+                self.wfile.write(b'{"ok":true}' if status == 200 else b'{"ok":false,"error":"invalid_workflow_input"}')
+        http.server.HTTPServer(('127.0.0.1', 8765), Handler).serve_forever()
+        EOF
+        python3 /tmp/mock.py &
+        sleep 1
+
+    - name: Important, mapped owner
+      uses: ./notify-slack
+      with:
+        level: important
+        text: 'main broke: "a $(quoted) title"'
+        link: https://example.com/run/1
+        mention: renovate[bot],eameh,jsenko
+        user-map: '{"jsenko": "U222"}'
+        important-webhook: http://127.0.0.1:8765/important
+
+    - name: General, no webhook configured
+      uses: ./notify-slack
+      with:
+        level: general
+        text: not sent
+        important-webhook: http://127.0.0.1:8765/important
+
+    - name: Slack rejects the message
+      run: echo 400 > /tmp/mock-status
+
+    - name: Rejected message does not fail the job
+      uses: ./notify-slack
+      with:
+        level: general
+        text: rejected
+        general-webhook: http://127.0.0.1:8765/general
+
+    - name: Verify what reached the webhook
+      run: |
+        cat /tmp/requests.jsonl
+        expected='{"user":"U222","text":"main broke: \"a $(quoted) title\"\nhttps://example.com/run/1"}
+        {"text":"rejected"}'
+        actual=$(jq -c . /tmp/requests.jsonl)
+        if [[ "$actual" != "$expected" ]]; then
+          echo "❌ Unexpected requests. Expected:"
+          echo "$expected"
+          exit 1
+        fi
+        echo "✅ Webhook received exactly the expected requests"
