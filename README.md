@@ -36,14 +36,13 @@ To publish these actions to the GitHub Actions Marketplace:
 1. Create a new directory for your action
 2. Add an `action.yml` file with the action definition
 3. Include a comprehensive `README.md` with usage examples
-4. Add tests in `.github/workflows/` to validate the action
+4. Add tests in `.github/workflows/test-<action>.yml` (triggered by `workflow_call` and `workflow_dispatch`), and call them from `verify.yml`: a paths filter and a job for the action, which `Verify Build` needs
 5. Update this main README.md to list the new action
 
 ## Testing
 
-Each action includes automated tests that run on:
-- Push to action-specific files
-- Pull requests affecting action files
-- Manual workflow dispatch
-
-Run tests locally or view results in the Actions tab.
+Each action has its own test workflow, `.github/workflows/test-<action>.yml`. On pushes to `main` and on
+pull requests, `verify.yml` runs the tests of each action whose files (or test workflow) changed, and reports
+the result as the `Verify Build` check, which branch protection requires. A change to `verify.yml` runs every
+action's tests, as does running Verify by hand. A single action's tests can also be run by hand from the
+Actions tab.

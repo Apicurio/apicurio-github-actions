@@ -1,0 +1,106 @@
+name: Verify
+
+# Runs the tests of each action a change touches, and reports one result,
+# "Verify Build", which branch protection requires.
+#
+# Each action's tests live in their own test-<action>.yml, called here only
+# when that action's files or its test workflow changed. A change to this file
+# runs them all, as does a manual run. Skipped tests count as passed; failed
+# or cancelled ones fail Verify Build.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  changes:
+    name: Changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      load-docker-image: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.all == 'true' || steps.filter.outputs.load-docker-image == 'true' }}
+      save-docker-image: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.all == 'true' || steps.filter.outputs.save-docker-image == 'true' }}
+      setup-minikube: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.all == 'true' || steps.filter.outputs.setup-minikube == 'true' }}
+      notify-slack: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.all == 'true' || steps.filter.outputs.notify-slack == 'true' }}
+    steps:
+      # A push is compared with the commit before it, which needs the history;
+      # a PR's changed files come from the API.
+      - name: Checkout
+        if: github.event_name == 'push'
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect changed actions
+        id: filter
+        if: github.event_name != 'workflow_dispatch'
+        uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
+        with:
+          filters: |
+            all:
+              - '.github/workflows/verify.yml'
+            load-docker-image:
+              - 'load-docker-image/**'
+              - '.github/workflows/test-load-docker-image.yml'
+            save-docker-image:
+              - 'save-docker-image/**'
+              - '.github/workflows/test-save-docker-image.yml'
+            setup-minikube:
+              - 'setup-minikube/**'
+              - '.github/workflows/test-setup-minikube.yml'
+            notify-slack:
+              - 'notify-slack/**'
+              - '.github/workflows/test-notify-slack.yml'
+
+  load-docker-image:
+    name: load-docker-image
+    needs: changes
+    if: needs.changes.outputs.load-docker-image == 'true'
+    uses: ./.github/workflows/test-load-docker-image.yml
+
+  save-docker-image:
+    name: save-docker-image
+    needs: changes
+    if: needs.changes.outputs.save-docker-image == 'true'
+    uses: ./.github/workflows/test-save-docker-image.yml
+
+  setup-minikube:
+    name: setup-minikube
+    needs: changes
+    if: needs.changes.outputs.setup-minikube == 'true'
+    uses: ./.github/workflows/test-setup-minikube.yml
+
+  notify-slack:
+    name: notify-slack
+    needs: changes
+    if: needs.changes.outputs.notify-slack == 'true'
+    uses: ./.github/workflows/test-notify-slack.yml
+
+  # The required check. Always runs, so a PR that touches no action still gets
+  # a result instead of waiting for one.
+  verify-build:
+    name: Verify Build
+    needs: [changes, load-docker-image, save-docker-image, setup-minikube, notify-slack]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check results
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          jq -r 'to_entries[] | "\(.key): \(.value.result)"' <<< "$RESULTS"
+          failed=$(jq -r '[to_entries[] | select(.value.result == "failure" or .value.result == "cancelled") | .key] | join(", ")' <<< "$RESULTS")
+          if [[ -n "$failed" ]]; then
+            echo "::error::Failed: $failed"
+            exit 1
+          fi

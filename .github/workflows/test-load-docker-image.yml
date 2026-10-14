@@ -1,12 +1,9 @@
 name: Test Load Docker Image Action
 
+# Called by verify.yml when load-docker-image/ or this file changes. Run it by hand
+# from the Actions tab to test the action on its own.
 on:
-  push:
-    paths:
-      - 'load-docker-image/**'
-  pull_request:
-    paths:
-      - 'load-docker-image/**'
+  workflow_call:
   workflow_dispatch:
 
 jobs:
