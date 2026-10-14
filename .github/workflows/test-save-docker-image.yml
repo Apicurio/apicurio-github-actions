@@ -1,12 +1,9 @@
 name: Test Save Docker Image Action
 
+# Called by verify.yml when save-docker-image/ or this file changes. Run it by hand
+# from the Actions tab to test the action on its own.
 on:
-  push:
-    paths:
-      - 'save-docker-image/**'
-  pull_request:
-    paths:
-      - 'save-docker-image/**'
+  workflow_call:
   workflow_dispatch:
 
 jobs:

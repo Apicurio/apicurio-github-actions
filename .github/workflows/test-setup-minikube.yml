@@ -1,12 +1,9 @@
 name: Test Setup Minikube Action
 
+# Called by verify.yml when setup-minikube/ or this file changes. Run it by hand
+# from the Actions tab to test the action on its own.
 on:
-  push:
-    paths:
-      - 'setup-minikube/**'
-  pull_request:
-    paths:
-      - 'setup-minikube/**'
+  workflow_call:
   workflow_dispatch:
 
 jobs:
