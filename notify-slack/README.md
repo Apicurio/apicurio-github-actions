@@ -45,6 +45,15 @@ There is only one mention slot, so name everyone else in `text` as `@login`.
 If nobody can be mentioned, the message is still sent, saying which logins had no mapping.
 To be mentioned, ask an organization admin to add you to `SLACK_USER_MAP`.
 
+Machine users are skipped without being reported: logins ending in `[bot]`, `apicurio-ci`, and
+any listed in `machine-users`. A workflow that can run as another CI account, for example one
+triggered by a release that account created, names it there:
+
+```yaml
+    mention: ${{ github.actor }}
+    machine-users: apitomy-ci
+```
+
 ## Slack setup
 
 Both webhooks are Slack Workflow Builder workflows: general has the template `{text}`, important

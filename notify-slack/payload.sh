@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Builds the Slack payload for the notify-slack action and prints it.
-# Input comes from the environment: LEVEL, TEXT, LINK, MENTION, USER_MAP.
+# Input comes from the environment: LEVEL, TEXT, LINK, MENTION, USER_MAP,
+# MACHINE_USERS.
 #
 # The webhooks are Slack Workflow Builder workflows. General takes {text};
 # important takes {user} {text}. Workflow Builder rejects a payload unless
@@ -10,8 +11,11 @@
 set -euo pipefail
 
 PLACEHOLDER_USER=USLACKBOT
-# Machine users without the "[bot]" suffix GitHub apps get.
-MACHINE_USERS=" apicurio-ci "
+# Machine users without the "[bot]" suffix GitHub apps get: apicurio-ci, and
+# any the caller names, such as another organization's CI account.
+machine_users=${MACHINE_USERS:-}
+machine_users=${machine_users,,}
+skipped=" apicurio-ci ${machine_users//,/ } "
 
 message=$TEXT
 if [[ -n "${LINK:-}" ]]; then
@@ -42,7 +46,7 @@ case "$LEVEL" in
     IFS=', ' read -ra logins <<< "${MENTION:-}"
     for login in "${logins[@]}"; do
       login=${login,,}
-      if [[ "$login" == *"[bot]" || "$MACHINE_USERS" == *" $login "* ]]; then
+      if [[ "$login" == *"[bot]" || "$skipped" == *" $login "* ]]; then
         continue
       fi
       user=$(jq -r --arg login "$login" '.[$login] // empty' <<< "$map")

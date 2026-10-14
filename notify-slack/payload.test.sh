@@ -31,6 +31,17 @@ check "important: first mapped login gets the mention" \
   LEVEL=important TEXT=$'main broke: "Fix #1"\nsecond line' LINK=https://example.com/run/1 \
   MENTION='renovate[bot], apicurio-ci,eameh,CARLESARNAL,jsenko' USER_MAP="$MAP"
 
+# Machine users are skipped without being reported as unmapped: apicurio-ci
+# always, others when the caller names them, in any case.
+check "important: machine users the caller names are skipped, in any case" \
+  '{"user": "USLACKBOT", "text": "Website update failed"}' -- \
+  LEVEL=important TEXT='Website update failed' MENTION='apicurio-ci,apitomy-ci' \
+  MACHINE_USERS='other-ci, Apitomy-CI' USER_MAP="$MAP"
+
+check "important: a machine user nobody named is an unmapped login" \
+  '{"user": "USLACKBOT", "text": "Website update failed\nNobody mentioned: no Slack mapping for @apitomy-ci."}' -- \
+  LEVEL=important TEXT='Website update failed' MENTION='apicurio-ci,apitomy-ci' USER_MAP="$MAP"
+
 # An unusable map loses the mention, never the message.
 check "important: no mapping falls back to the placeholder and says why" \
   '{"user": "USLACKBOT", "text": "Release failed\nNobody mentioned: no Slack mapping for @eameh, @someone."}' -- \
