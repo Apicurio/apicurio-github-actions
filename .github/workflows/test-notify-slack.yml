@@ -63,6 +63,17 @@ jobs:
         text: not sent
         important-webhook: http://127.0.0.1:8765/important
 
+    # The action passes machine-users through: unforwarded, the text would
+    # say that apitomy-ci has no mapping.
+    - name: Important, only a named machine user
+      uses: ./notify-slack
+      with:
+        level: important
+        text: machine run failed
+        mention: apitomy-ci
+        machine-users: apitomy-ci
+        important-webhook: http://127.0.0.1:8765/important
+
     - name: Slack rejects the message
       run: echo 400 > /tmp/mock-status
 
@@ -77,6 +88,7 @@ jobs:
       run: |
         cat /tmp/requests.jsonl
         expected='{"user":"U222","text":"main broke: \"a $(quoted) title\"\nhttps://example.com/run/1"}
+        {"user":"USLACKBOT","text":"machine run failed"}
         {"text":"rejected"}'
         actual=$(jq -c . /tmp/requests.jsonl)
         if [[ "$actual" != "$expected" ]]; then

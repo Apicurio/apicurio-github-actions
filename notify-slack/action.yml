@@ -20,6 +20,10 @@ inputs:
     description: 'GitHub logins in priority order, comma-separated; the first with a Slack mapping is mentioned. important only'
     required: false
     default: ''
+  machine-users:
+    description: 'GitHub logins of machine users, comma-separated, never mentioned: a run they started has no person to mention. apicurio-ci and "[bot]" logins are always skipped'
+    required: false
+    default: ''
   user-map:
     description: 'JSON object mapping GitHub logins to Slack member IDs, usually secrets.SLACK_USER_MAP'
     required: false
@@ -45,6 +49,7 @@ runs:
         TEXT: ${{ inputs.text }}
         LINK: ${{ inputs.link }}
         MENTION: ${{ inputs.mention }}
+        MACHINE_USERS: ${{ inputs.machine-users }}
         USER_MAP: ${{ inputs.user-map }}
         IMPORTANT_WEBHOOK: ${{ inputs.important-webhook }}
         GENERAL_WEBHOOK: ${{ inputs.general-webhook }}
